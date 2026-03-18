@@ -135,6 +135,9 @@ class BuilderBot(Unit):
 
         self.movement.upd(c)
 
+        if c.get_hp(my_id) < c.get_max_hp(my_id) and c.can_heal(my_pos):
+            c.heal(my_pos)
+
         if self.target_type == 0:
             self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
             self.target_type = 1
