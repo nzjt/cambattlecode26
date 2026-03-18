@@ -5,17 +5,20 @@ from Movement import Movement
 from Nav import Nav
 from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
+from TileManager import TileManager
 
 
 class BuilderBot(Unit):
     def __init__(self):
         self.movement: Movement | None = None
+        self.tile_manager: TileManager | None = None
         self.nav: Nav = Bug0Better()
         self.home: Position | None = None
         self.target: Position | None = None
         self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home
         self.target_dist: int = 0
         self.conveyor_bug: ConveyorManager | None = None
+        self.expiry: int = 0
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -73,9 +76,10 @@ class BuilderBot(Unit):
         if self.home is None:
             self.home = c.get_position(c.get_tile_building_id(my_pos))
             self.movement = Movement()
+            self.tile_manager = TileManager(c)
 
         if self.target_type == 1:
-            if c.is_in_vision(self.target):
+            if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
                 self.target_type = 0
         elif self.target_type == 2:
             if c.is_in_vision(self.target):
@@ -106,12 +110,14 @@ class BuilderBot(Unit):
                     self.target_type = 0
 
         self.sense(c)
+        self.tile_manager.sense(c)
 
         self.movement.upd(c)
 
         if self.target_type == 0:
-            self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height()))
+            self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
             self.target_type = 1
+            self.expiry = c.get_current_round() + 60
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)

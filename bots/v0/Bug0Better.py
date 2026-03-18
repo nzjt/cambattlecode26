@@ -49,10 +49,9 @@ class Bug0Better(Nav):
                 movement.move(opt)
                 self.turn = None
                 return
-        elif self.turn is None:
+        elif self.prev is None:
             self.turn = bool(random.randint(0, 1))
             self.dist = dist
-            self.prev = None
 
         if self.turn:
             # Left turning

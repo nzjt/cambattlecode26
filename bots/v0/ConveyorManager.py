@@ -9,6 +9,7 @@ class ConveyorManager:
         self.path: list[Position] = [c.get_position(c.get_id())]
         self.target: Position = target
         self.turn: bool | None = None
+        self.dist: int = 0
 
     def step(self, c: Controller):
         cur: Position = self.path[-1]
@@ -37,50 +38,67 @@ class ConveyorManager:
             e_type = c.get_entity_type(building_id)
             return e_type == EntityType.ROAD or e_type == EntityType.CORE
 
-        d = opt
-        nxt = cur.add(d)
-        if can_move(nxt):
-            self.turn = None
+        if len(self.path) >= 2 and self.turn is not None:
+            d = self.path[-2].direction_to(self.path[-1])
+            if self.turn:
+                d = d.rotate_right().rotate_right()
+            else:
+                d = d.rotate_left().rotate_left()
         else:
+            d = opt
+
+        dist = self.path[-1].distance_squared(self.target)
+        nxt = cur.add(opt)
+        if can_move(nxt):
             if self.turn is None:
-                self.turn = bool(random.randint(0, 1))
-
-            counter = 2
-            while counter > 0:
-                counter -= 1
-                if self.turn:
-                    # Left turning
-                    for _ in range(2):
-                        d = d.rotate_left().rotate_left()
-                        nxt = cur.add(d)
-
-                        if self.on_path[nxt.y][nxt.x]:
-                            self.turn = False
-                            d = opt
-                            break
-                        elif can_move(nxt):
-                            counter = -1
-                            break
-                    else:
-                        return
-                else:
-                    # Right turning
-                    for _ in range(2):
-                        d = d.rotate_right().rotate_right()
-                        nxt = cur.add(d)
-
-                        if self.on_path[nxt.y][nxt.x]:
-                            self.turn = True
-                            d = opt
-                            break
-                        elif can_move(nxt):
-                            counter = -1
-                            break
-                    else:
-                        return
-
-            if not counter:
+                self.path.append(nxt)
                 return
+            elif dist < self.dist:
+                self.turn = None
+                self.path.append(nxt)
+                return
+        elif self.turn is None:
+            self.turn = bool(random.randint(0, 1))
+            self.dist = self.path[-1].distance_squared(self.target)
+
+        counter = 2
+        while counter > 0:
+            counter -= 1
+            if self.turn:
+                # Left turning
+                for _ in range(3):
+                    nxt = cur.add(d)
+
+                    if self.on_path[nxt.y][nxt.x]:
+                        self.turn = False
+                        d = opt
+                        break
+                    elif can_move(nxt):
+                        counter = -1
+                        break
+
+                    d = d.rotate_left().rotate_left()
+                else:
+                    return
+            else:
+                # Right turning
+                for _ in range(3):
+                    nxt = cur.add(d)
+
+                    if self.on_path[nxt.y][nxt.x]:
+                        self.turn = True
+                        d = opt
+                        break
+                    elif can_move(nxt):
+                        counter = -1
+                        break
+
+                    d = d.rotate_right().rotate_right()
+                else:
+                    return
+
+        if not counter:
+            return
 
         self.path.append(cur.add(d))
 
@@ -93,4 +111,7 @@ class ConveyorManager:
         return True
 
     def update(self, target: Position):
-        self.target = target
+        if target != self.target:
+            self.target = target
+            if self.turn is not None:
+                self.dist = self.path[-1].distance_squared(target)
