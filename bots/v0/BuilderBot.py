@@ -42,9 +42,30 @@ class BuilderBot(Unit):
                     if not self.conveyor_bug.on_path[pos.y][pos.x]:
                         dist = self.conveyor_bug.path[-1].distance_squared(pos)
                         if dist < self.target_dist:
-                            self.target = pos
-                            self.target_dist = dist
-                            self.conveyor_bug.update(pos)
+                            good = True
+                            cur = pos
+                            for _ in range(10):
+                                building_id = c.get_tile_building_id(cur)
+                                if building_id is None or c.get_team(building_id) != my_team:
+                                    good = False
+                                    break
+                                e_type = c.get_entity_type(building_id)
+                                if e_type != EntityType.CONVEYOR:
+                                    good = e_type == EntityType.CORE
+                                    break
+                                cur = cur.add(c.get_direction(building_id))
+                                if c.is_in_vision(cur):
+                                    if self.conveyor_bug.on_path[cur.y][cur.x]:
+                                        good = False
+                                        break
+                                else:
+                                    # Probably fine?
+                                    break
+
+                            if good:
+                                self.target = pos
+                                self.target_dist = dist
+                                self.conveyor_bug.update(pos)
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
