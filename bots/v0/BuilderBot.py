@@ -2,13 +2,13 @@ from cambc import *
 from Unit import Unit
 from Movement import Movement
 from Nav import Nav
-from Bug0 import Bug0
+from Bug0Better import Bug0Better
 
 
 class BuilderBot(Unit):
     def __init__(self):
         self.movement: Movement | None = None
-        self.nav: Nav = Bug0()
+        self.nav: Nav = Bug0Better()
 
     def run(self, c: Controller):
         if self.movement is None:

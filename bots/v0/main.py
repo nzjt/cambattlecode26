@@ -1,3 +1,4 @@
+import random
 from cambc import *
 from Unit import Unit
 from Core import Core
@@ -10,6 +11,7 @@ class Player:
 
     def run(self, c: Controller) -> None:
         if self.unit is None:
+            random.seed(c.get_id())
             my_type = c.get_entity_type(c.get_id())
             if my_type == EntityType.CORE:
                 self.unit = Core()
