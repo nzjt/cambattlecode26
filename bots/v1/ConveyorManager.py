@@ -3,10 +3,10 @@ from cambc import *
 
 
 class ConveyorManager:
-    def __init__(self, c: Controller, target: Position):
+    def __init__(self, c: Controller, start: Position, target: Position):
         W: int = c.get_map_width()
         self.on_path = [[False] * W for _ in range(c.get_map_height())]
-        self.path: list[Position] = [c.get_position(c.get_id())]
+        self.path: list[Position] = [start]
         self.target: Position = target
         self.turn: bool | None = None
         self.dist: int = 0
@@ -24,19 +24,24 @@ class ConveyorManager:
         else:
             opt: Direction = Direction.NORTH if dy > 0 else Direction.SOUTH
         team = c.get_team(c.get_id())
+        W = c.get_map_width()
+        H = c.get_map_height()
 
         def can_move(nxt: Position):
             if nxt == self.target:
                 return True
-            if c.get_tile_env(nxt) != Environment.EMPTY:
+            if 0 <= nxt.x <= W - 1 and 0 <= nxt.y <= H - 1:
+                if c.get_tile_env(nxt) != Environment.EMPTY:
+                    return False
+                building_id = c.get_tile_building_id(nxt)
+                if building_id is None:
+                    return True
+                if c.get_team(building_id) != team:
+                    return False
+                e_type = c.get_entity_type(building_id)
+                return e_type == EntityType.ROAD or e_type == EntityType.CORE
+            else:
                 return False
-            building_id = c.get_tile_building_id(nxt)
-            if building_id is None:
-                return True
-            if c.get_team(building_id) != team:
-                return False
-            e_type = c.get_entity_type(building_id)
-            return e_type == EntityType.ROAD or e_type == EntityType.CORE
 
         if len(self.path) >= 2 and self.turn is not None:
             d = self.path[-2].direction_to(self.path[-1])

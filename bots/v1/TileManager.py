@@ -3,9 +3,12 @@ from cambc import *
 
 class TileManager:
     def __init__(self, c: Controller):
-        self.pass_ = [0] * c.get_map_height()
+        W: int = c.get_map_width()
+        H: int = c.get_map_height()
+        self.pass_ = [0] * H
         self.allies: int = 0
         self.enemies: int = 0
+        self.build_harvester = [[True] * W for _ in range(H)]
 
     def sense(self, c: Controller):
         my_id = c.get_id()

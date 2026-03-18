@@ -18,4 +18,7 @@ class Player:
             elif my_type == EntityType.BUILDER_BOT:
                 self.unit = BuilderBot()
 
-        self.unit.run(c)
+        try:
+            self.unit.run(c)
+        except Exception as e:
+            raise Exception("{} {}".format(c.get_position(c.get_id()), c.get_current_round()))
