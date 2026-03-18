@@ -17,35 +17,42 @@ class Bug0Better(Nav):
 
         if target != self.target:
             self.target = target
-            self.turn = None
+            self.prev = None
 
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
-        d: Direction = my_pos.direction_to(target)
+        opt: Direction = my_pos.direction_to(target)
 
-        if d == Direction.CENTRE:
+        if opt == Direction.CENTRE:
             return
+
+        if self.prev is not None:
+            if self.turn:
+                d = self.prev.rotate_right().rotate_right()
+                if movement.can_move(d.rotate_right()):
+                    self.prev = None
+            else:
+                d = self.prev.rotate_left().rotate_left()
+                if movement.can_move(d.rotate_left()):
+                    self.prev = None
+
+        if self.prev is None:
+            d = opt
 
         dist = my_pos.distance_squared(target)
 
-        if movement.can_move(d):
-            if self.turn is None:
-                movement.move(d)
+        if movement.can_move(opt):
+            if self.prev is None:
+                movement.move(opt)
                 return
             elif dist < self.dist:
-                movement.move(d)
+                movement.move(opt)
                 self.turn = None
                 return
         elif self.turn is None:
             self.turn = bool(random.randint(0, 1))
             self.dist = dist
             self.prev = None
-
-        if self.prev is not None:
-            if self.turn:
-                d = self.prev.rotate_right().rotate_right()
-            else:
-                d = self.prev.rotate_left().rotate_left()
 
         if self.turn:
             # Left turning
