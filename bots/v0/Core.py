@@ -4,5 +4,11 @@ from Unit import Unit
 
 class Core(Unit):
     def run(self, c: Controller):
-        if c.get_current_round() == 0:
-            c.spawn_builder(c.get_position(c.get_id()))
+        my_pos = c.get_position(c.get_id())
+
+        if c.get_current_round() <= 5:
+            for d in Direction:
+                pos = my_pos.add(d)
+                if c.can_spawn(pos):
+                    c.spawn_builder(pos)
+                    break
