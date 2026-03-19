@@ -6,6 +6,7 @@ from Nav import Nav
 from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
+from Bfs import Bfs
 
 
 class BuilderBot(Unit):
@@ -19,6 +20,7 @@ class BuilderBot(Unit):
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
+        self.bfs: Bfs | None = None
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -39,33 +41,35 @@ class BuilderBot(Unit):
                     continue
 
                 if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) == my_team:
-                    if not self.conveyor_manager.on_path[pos.y][pos.x]:
+                    xi, yi = pos
+                    if not self.conveyor_manager.on_path[yi][xi]:
                         dist = self.conveyor_manager.path[-1].distance_squared(pos)
                         if dist < self.target_dist:
-                            good = True
-                            cur = pos
-                            for _ in range(10):
-                                building_id = c.get_tile_building_id(cur)
-                                if building_id is None or c.get_team(building_id) != my_team:
-                                    good = False
-                                    break
-                                e_type = c.get_entity_type(building_id)
-                                if e_type != EntityType.CONVEYOR:
-                                    good = e_type == EntityType.CORE
-                                    break
-                                cur = cur.add(c.get_direction(building_id))
-                                if c.is_in_vision(cur):
-                                    if self.conveyor_manager.on_path[cur.y][cur.x]:
+                            if self.bfs.can_conveyor_reach(xi - my_pos.x, yi - my_pos.y):
+                                good = True
+                                cur = pos
+                                for _ in range(10):
+                                    building_id = c.get_tile_building_id(cur)
+                                    if building_id is None or c.get_team(building_id) != my_team:
                                         good = False
                                         break
-                                else:
-                                    # Probably fine?
-                                    break
+                                    e_type = c.get_entity_type(building_id)
+                                    if e_type != EntityType.CONVEYOR:
+                                        good = e_type == EntityType.CORE
+                                        break
+                                    cur = cur.add(c.get_direction(building_id))
+                                    if c.is_in_vision(cur):
+                                        if self.conveyor_manager.on_path[cur.y][cur.x]:
+                                            good = False
+                                            break
+                                    else:
+                                        # Probably fine?
+                                        break
 
-                            if good:
-                                self.target = pos
-                                self.target_dist = dist
-                                self.conveyor_manager.update(pos)
+                                if good:
+                                    self.target = pos
+                                    self.target_dist = dist
+                                    self.conveyor_manager.update(pos)
         else:
             W: int = c.get_map_width()
             H: int = c.get_map_height()
@@ -125,6 +129,7 @@ class BuilderBot(Unit):
             self.home = c.get_position(c.get_tile_building_id(my_pos))
             self.movement = Movement()
             self.tile_manager = TileManager(c)
+            self.bfs = Bfs(self.tile_manager)
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
@@ -148,8 +153,9 @@ class BuilderBot(Unit):
             else:
                 self.target_type = 0
 
-        self.sense(c)
         self.tile_manager.sense(c)
+        self.bfs.update()
+        self.sense(c)
 
         if self.target_type == 2:
             if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
@@ -233,8 +239,9 @@ class BuilderBot(Unit):
                             if c.get_entity_type(building_id) == EntityType.CONVEYOR:
                                 d = c.get_direction(building_id)
                             else:
-                                d = None
-                                self.nav.move(c, self.conveyor_manager.path[-1], self.movement)
+                                xi, yi = self.conveyor_manager.path[-1]
+                                pass_ = self.tile_manager.pass_ & ~self.tile_manager.ally & ~self.tile_manager.enemy
+                                d = self.bfs.bfs_adj_exc(xi - my_pos.x, yi - my_pos.y, pass_)
 
                         if d is not None and c.can_move(d):
                             self.movement.move_raw(d)

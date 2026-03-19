@@ -5,7 +5,7 @@ from cambc import *
 class ConveyorManager:
     def __init__(self, c: Controller, start: Position, target: Position):
         W: int = c.get_map_width()
-        self.on_path = [[False] * W for _ in range(c.get_map_height())]
+        self.on_path = [[False] * (W + 1) for _ in range(c.get_map_height() + 1)]
         self.path: list[Position] = [start]
         self.target: Position = target
         self.turn: bool | None = None
@@ -53,6 +53,7 @@ class ConveyorManager:
             d = opt
 
         dist = self.path[-1].distance_squared(self.target)
+        print(opt, d, dist, self.dist, self.turn)
         nxt = cur.add(opt)
         if can_move(nxt):
             if self.turn is None:
