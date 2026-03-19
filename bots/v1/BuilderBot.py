@@ -155,7 +155,6 @@ class BuilderBot(Unit):
 
         self.tile_manager.sense(c)
         self.bfs.update()
-        self.sense(c)
 
         if self.target_type == 2:
             if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
@@ -181,6 +180,7 @@ class BuilderBot(Unit):
                         self.conveyor_manager = ConveyorManager(c, harvester, self.target)
                         self.conveyor_manager.step(c)
 
+        self.sense(c)
         self.movement.upd(c)
 
         if c.get_hp(my_id) < c.get_max_hp(my_id) and c.can_heal(my_pos):

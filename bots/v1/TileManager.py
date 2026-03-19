@@ -107,7 +107,6 @@ class TileManager:
                     enemy |= 1 << (dx + dy * 10 + 44)
 
         self.ally = ally & -0x100000000001
-        print(bin(self.buildable_grid[25]))
         self.enemy = enemy
         self.pass_ = self.get_vision(x, y, self.pass_grid)
         self.buildable = self.get_vision(x, y, self.buildable_grid)
