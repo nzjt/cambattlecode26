@@ -124,7 +124,7 @@ class BuilderBot(Unit):
                 self.target_type = 0
 
         self.tile_manager.sense(c)
-        self.bfs.update()
+        self.bfs.update(c, self.conveyor_manager)
 
         if self.target_type == 2:
             if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
@@ -139,7 +139,6 @@ class BuilderBot(Unit):
                     self.target_type = 3
                     self.target_dist = my_pos.distance_squared(self.target)
                     self.conveyor_manager = ConveyorManager(c, my_pos, self.target)
-                    self.conveyor_manager.step(c)
                 elif dist == 1:
                     building_id = c.get_tile_building_id(self.target)
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
@@ -148,7 +147,13 @@ class BuilderBot(Unit):
                         self.target_type = 3
                         self.target_dist = my_pos.distance_squared(self.target)
                         self.conveyor_manager = ConveyorManager(c, harvester, self.target)
-                        self.conveyor_manager.step(c)
+
+                if self.target_type == 3:
+                    self.conveyor_manager.step(c)
+                    if len(self.conveyor_manager.path) == 1:
+                        xi, yi = self.conveyor_manager.path[0]
+                        self.tile_manager.ban_harvester[yi][xi] = True
+                        self.target_type = 0
 
         self.sense(c)
         self.movement.upd(c)
@@ -197,6 +202,9 @@ class BuilderBot(Unit):
                     self.conveyor_manager.step(c)
                     if not self.conveyor_manager.place(c, conveyor_target):
                         print("wtf")
+                        self.target_type = 0
+                        xi, yi = self.conveyor_manager.path[0]
+                        self.tile_manager.ban_harvester[yi][xi] = True
 
                 do_build = my_pos == self.conveyor_manager.path[0] and len(self.conveyor_manager.path) > 1
 

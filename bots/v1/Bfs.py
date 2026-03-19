@@ -10,16 +10,25 @@ class Bfs:
         self.tile_manager = tile_manager
         self.conveyor_reach: int = 0
 
-    def update(self):
-        pass_ = self.tile_manager.buildable
-        conveyor_reach = 0x100000000000
+    def update(self, c: Controller, conveyor_manager):
+        my_id = c.get_id()
+        my_pos = c.get_position(my_id)
 
-        for _ in range(15):
-            conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
-            conveyor_reach &= pass_
+        if conveyor_manager is not None:
+            pass_ = self.tile_manager.buildable
+            xi, yi = conveyor_manager.path[-1]
+            dx = xi - my_pos.x
+            dy = yi - my_pos.y
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                conveyor_reach = 1 << (dx + dy * 10 + 44)
+                for _ in range(15):
+                    conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
+                    conveyor_reach &= pass_
 
-        conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
-        self.conveyor_reach = conveyor_reach
+                conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
+                self.conveyor_reach = conveyor_reach
+            else:
+                self.conveyor_reach = 0
 
     def can_conveyor_reach(self, dx: int, dy: int) -> int:
         if -4 <= dx <= 4 and -4 <= dy <= 4:

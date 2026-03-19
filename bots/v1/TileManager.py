@@ -24,6 +24,7 @@ class TileManager:
         self.pass_: int = 0
         self.buildable: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
+        self.ban_harvester = [[False] * W for _ in range(H)]
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -118,6 +119,9 @@ class TileManager:
                     e_type = get_entity_type(building_id)
                     if e_type == EntityType.HARVESTER and pos.distance_squared(my_pos) <= 13:
                         self.build_harvester[yi][xi] = False
+                        if self.ban_harvester[yi][xi]:
+                            continue
+
                         print("test", pos)
                         has_space, has_conveyor = False, False
                         for d in CARDINAL:
