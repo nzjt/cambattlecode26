@@ -172,6 +172,13 @@ class BuilderBot(Unit):
                 self.expiry = c.get_current_round() + 60
 
         if self.target_type == 1:
+            if c.get_current_round() >= 300:
+                building_id = c.get_tile_building_id(my_pos)
+                if building_id is not None:
+                    if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) != my_team:
+                        c.self_destruct()
+                        return
+
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 2:
@@ -211,7 +218,9 @@ class BuilderBot(Unit):
                         xi, yi = self.conveyor_manager.path[0]
                         self.tile_manager.ban_harvester[yi][xi] = True
 
-                do_build = my_pos == self.conveyor_manager.path[0] and len(self.conveyor_manager.path) > 1
+                do_build = (my_pos == self.conveyor_manager.path[0] and
+                            len(self.conveyor_manager.path) > 1 and
+                            c.get_team(c.get_tile_building_id(self.conveyor_manager.path[0])) == my_team)
 
                 if my_pos.distance_squared(self.conveyor_manager.path[-1]) > 1:
                     if not do_build or not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
