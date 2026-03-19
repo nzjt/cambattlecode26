@@ -13,6 +13,12 @@ class TileManager:
         Environment.ORE_TITANIUM,
         Environment.ORE_AXIONITE
     }
+    ENV_MAP = {
+        Environment.WALL: 0,
+        Environment.EMPTY: 1,
+        Environment.ORE_TITANIUM: 2,
+        Environment.ORE_AXIONITE: 3
+    }
 
     def __init__(self, c: Controller):
         W: int = c.get_map_width()
@@ -25,6 +31,7 @@ class TileManager:
         self.buildable: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
+        self.env_grid = [[0] * (W + 1) for _ in range(H + 1)]
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -69,7 +76,7 @@ class TileManager:
         else:
             clear >>= 4 - x
 
-        pass_grid, buildable_grid = self.pass_grid, self.buildable_grid
+        pass_grid, buildable_grid, env_grid = self.pass_grid, self.buildable_grid, self.env_grid
         W, H = c.get_map_width(), c.get_map_height()
         for yi in range(max(0, y - 4), min(H, y + 5)):
             pass_grid[yi] &= clear
@@ -82,11 +89,13 @@ class TileManager:
         WALL = Environment.WALL
         CORE = EntityType.CORE
         ORES = TileManager.ORES
+        ENV_MAP = TileManager.ENV_MAP
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
             building_id = get_tile_building_id(pos)
             env = get_tile_env(pos)
+            env_grid[yi][xi] = ENV_MAP[env]
             if building_id is None:
                 if env != WALL:
                     buildable_grid[yi] |= 1 << xi

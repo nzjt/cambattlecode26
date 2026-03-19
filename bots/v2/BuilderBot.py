@@ -7,6 +7,7 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
+from AStar import AStar
 
 
 class BuilderBot(Unit):
@@ -100,6 +101,7 @@ class BuilderBot(Unit):
             self.movement = Movement()
             self.tile_manager = TileManager(c)
             self.bfs = Bfs(self.tile_manager)
+            AStar.precomp(c.get_map_width(), c.get_map_height(), *self.home)
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
@@ -154,6 +156,13 @@ class BuilderBot(Unit):
                         xi, yi = self.conveyor_manager.path[0]
                         self.tile_manager.ban_harvester[yi][xi] = True
                         self.target_type = 0
+                    else:
+                        a_star = AStar(self.tile_manager, c.get_map_width(), c.get_map_height())
+                        a_star.compute(self.conveyor_manager.path[0], self.target)
+                        a_star.find_path(self.home)
+                        path = a_star.path
+                        for i in range(1, len(path)):
+                            c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
 
         self.sense(c)
         self.movement.upd(c)
@@ -164,7 +173,7 @@ class BuilderBot(Unit):
         if self.target_type == 0:
             self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
             self.target_type = 1
-            self.expiry = c.get_current_round() + 60
+            self.expiry = c.get_current_round() + 260
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
