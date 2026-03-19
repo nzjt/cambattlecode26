@@ -71,8 +71,6 @@ class BuilderBot(Unit):
                                     self.target_dist = dist
                                     self.conveyor_manager.update(pos)
         else:
-            W: int = c.get_map_width()
-            H: int = c.get_map_height()
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
                 if env == Environment.ORE_TITANIUM or env == Environment.ORE_AXIONITE:
@@ -83,34 +81,6 @@ class BuilderBot(Unit):
                         continue
 
                     dist = my_pos.distance_squared(pos)
-                    building_id = c.get_tile_building_id(pos)
-                    if building_id is not None:
-                        e_type = c.get_entity_type(building_id)
-                        if e_type != EntityType.ROAD:
-                            if e_type == EntityType.HARVESTER and dist <= 13:
-                                self.tile_manager.build_harvester[pos.y][pos.x] = False
-                                has_space, has_conveyor = False, False
-                                for d in Unit.CARDINAL:
-                                    cur: Position = pos.add(d)
-                                    if 0 <= cur.x <= W - 1 and 0 <= cur.y <= H - 1:
-                                        if c.get_tile_env(cur) == Environment.WALL:
-                                            continue
-                                        building_id = c.get_tile_building_id(cur)
-                                        if building_id is None:
-                                            has_space = True
-                                        else:
-                                            if c.get_team(building_id) != my_team:
-                                                continue
-                                            e_type = c.get_entity_type(building_id)
-                                            if e_type == EntityType.CONVEYOR:
-                                                has_conveyor = True
-                                                break
-                                            elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
-                                                has_space = True
-                                if has_conveyor or not has_space:
-                                    continue
-
-                    self.tile_manager.build_harvester[pos.y][pos.x] = True
                     if self.target_type == 2:
                         if dist >= self.target_dist:
                             break
