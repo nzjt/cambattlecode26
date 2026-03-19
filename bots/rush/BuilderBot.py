@@ -241,19 +241,22 @@ class BuilderBot(Unit):
             for d in Direction:
                 nxt = my_pos.add(d)
                 if c.can_build_gunner(nxt, Direction.NORTH):
-                    if nxt.distance_squared(self.target) <= 5:
+                    if nxt.distance_squared(self.tile_manager.enemy_home) <= 8:
                         for e in CARDINAL:
                             candidate = nxt.add(e)
                             building_id = c.get_tile_building_id(candidate)
                             if c.get_entity_type(building_id) == EntityType.CONVEYOR:
-                                if c.get_team(building_id) != my_team:
-                                    c.build_gunner(nxt, nxt.direction_to(self.target))
-                                    break
+                                if c.get_direction(building_id) == e.opposite():
+                                    if c.get_team(building_id) != my_team:
+                                        c.build_gunner(nxt, nxt.direction_to(self.tile_manager.enemy_home))
+                                        break
                         else:
                             continue
                         break
 
-            if my_pos.distance_squared(self.target) <= 5:
+            wait = False
+
+            if my_pos.distance_squared(self.tile_manager.enemy_home) <= 8:
                 building_id = c.get_tile_building_id(my_pos)
                 if c.get_entity_type(building_id) == EntityType.CONVEYOR:
                     if c.get_team(building_id) != my_team:
@@ -261,7 +264,26 @@ class BuilderBot(Unit):
                             if self.tile_manager.ally & Bfs.ADJ:
                                 c.self_destruct()
                                 return
+                            wait = True
 
-            self.nav.move(c, self.target, self.movement)
-            my_pos = c.get_position(my_id)
-            c.draw_indicator_line(my_pos, self.target, 255, 255, 0)
+                if self.target == self.tile_manager.enemy_home or my_pos == self.target:
+                    x, y = self.tile_manager.enemy_home
+                    W = c.get_map_width()
+                    H = c.get_map_height()
+                    options = []
+                    for dx in range(-2, 3):
+                        for dy in range(-2, 3):
+                            xi, yi = x + dx, y + dy
+                            if 0 <= xi < W and 0 <= yi < H:
+                                candidate = Position(xi, yi)
+                                if c.is_in_vision(candidate) and c.is_tile_passable(candidate):
+                                    options.append(candidate)
+                    if options:
+                        self.target = random.choice(options)
+                    else:
+                        self.target = self.tile_manager.enemy_home
+
+            if not wait:
+                self.nav.move(c, self.target, self.movement)
+                my_pos = c.get_position(my_id)
+                c.draw_indicator_line(my_pos, self.target, 255, 255, 0)
