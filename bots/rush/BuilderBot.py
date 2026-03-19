@@ -7,6 +7,7 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
+from consts import *
 
 
 class BuilderBot(Unit):
@@ -16,7 +17,7 @@ class BuilderBot(Unit):
         self.nav: Nav = Bug0Better()
         self.home: Position | None = None
         self.target: Position | None = None
-        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home
+        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: attack enemy core
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
@@ -162,9 +163,13 @@ class BuilderBot(Unit):
             c.heal(my_pos)
 
         if self.target_type == 0:
-            self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-            self.target_type = 1
-            self.expiry = c.get_current_round() + 60
+            if c.get_current_round() >= 300 and self.tile_manager.enemy_home is not None:
+                self.target = self.tile_manager.enemy_home
+                self.target_type = 4
+            else:
+                self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
+                self.target_type = 1
+                self.expiry = c.get_current_round() + 60
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
@@ -232,3 +237,31 @@ class BuilderBot(Unit):
 
                 c.draw_indicator_line(my_pos, self.target, 0, 0, 255)
                 c.draw_indicator_line(my_pos, self.conveyor_manager.path[-1], 0, 255, 255)
+        elif self.target_type == 4:
+            for d in Direction:
+                nxt = my_pos.add(d)
+                if c.can_build_gunner(nxt, Direction.NORTH):
+                    if nxt.distance_squared(self.target) <= 5:
+                        for e in CARDINAL:
+                            candidate = nxt.add(e)
+                            building_id = c.get_tile_building_id(candidate)
+                            if c.get_entity_type(building_id) == EntityType.CONVEYOR:
+                                if c.get_team(building_id) != my_team:
+                                    c.build_gunner(nxt, nxt.direction_to(self.target))
+                                    break
+                        else:
+                            continue
+                        break
+
+            if my_pos.distance_squared(self.target) <= 5:
+                building_id = c.get_tile_building_id(my_pos)
+                if c.get_entity_type(building_id) == EntityType.CONVEYOR:
+                    if c.get_team(building_id) != my_team:
+                        if c.get_stored_resource(building_id) is not None:
+                            if self.tile_manager.ally & Bfs.ADJ:
+                                c.self_destruct()
+                                return
+
+            self.nav.move(c, self.target, self.movement)
+            my_pos = c.get_position(my_id)
+            c.draw_indicator_line(my_pos, self.target, 255, 255, 0)

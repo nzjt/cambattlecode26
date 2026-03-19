@@ -25,6 +25,7 @@ class TileManager:
         self.buildable: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
+        self.enemy_home: Position | None = None
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -101,6 +102,8 @@ class TileManager:
                 elif e_type == CORE:
                     if get_team(building_id) == my_team:
                         pass_grid[yi] |= 1 << xi
+                    else:
+                        self.enemy_home = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_grid[yi] |= 1 << xi
 

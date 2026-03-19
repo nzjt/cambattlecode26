@@ -3,6 +3,7 @@ from cambc import *
 from Unit import Unit
 from Core import Core
 from BuilderBot import BuilderBot
+from Gunner import Gunner
 
 
 class Player:
@@ -13,10 +14,12 @@ class Player:
         if self.unit is None:
             random.seed(c.get_id())
             my_type = c.get_entity_type(c.get_id())
-            if my_type == EntityType.CORE:
-                self.unit = Core()
-            elif my_type == EntityType.BUILDER_BOT:
+            if my_type == EntityType.BUILDER_BOT:
                 self.unit = BuilderBot()
+            elif my_type == EntityType.GUNNER:
+                self.unit = Gunner()
+            elif my_type == EntityType.CORE:
+                self.unit = Core()
 
         try:
             self.unit.run(c)
