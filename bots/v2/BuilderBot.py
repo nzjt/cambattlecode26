@@ -101,7 +101,6 @@ class BuilderBot(Unit):
             self.movement = Movement()
             self.tile_manager = TileManager(c)
             self.bfs = Bfs(self.tile_manager)
-            AStar.precomp(c.get_map_width(), c.get_map_height(), *self.home)
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
@@ -159,7 +158,7 @@ class BuilderBot(Unit):
                     else:
                         a_star = AStar(self.tile_manager, c.get_map_width(), c.get_map_height())
                         a_star.compute(self.conveyor_manager.path[0], self.target)
-                        a_star.find_path(self.home)
+                        a_star.find_path(self.conveyor_manager.path[0])
                         path = a_star.path
                         for i in range(1, len(path)):
                             c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
