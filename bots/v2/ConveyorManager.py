@@ -3,7 +3,7 @@ from AStarJPSOptimised import AStarJPSOptimised
 from TileManager import TileManager
 from Movement import Movement
 from Bfs import Bfs
-from consts import  *
+from consts import *
 
 
 class ConveyorManager:
@@ -93,6 +93,8 @@ class ConveyorManager:
                     if c.can_build_harvester(pos):
                         c.build_harvester(pos)
                         self.done = True
+                else:
+                    self.done = True
             else:
                 # Probably built
                 self.done = True
@@ -120,13 +122,42 @@ class ConveyorManager:
                 c.destroy(self.path[0])
             c.build_harvester(self.path[0])
 
-        d: Direction = pos.direction_to(self.path[self.index + 1])
-        if c.can_destroy(pos):
-            c.destroy(pos)
-        dx, dy = d.delta()
-        if dx and dy:
-            if c.can_build_bridge(pos, pos.add(d)):
-                c.build_bridge(pos, pos.add(d))
-        else:
-            if c.can_build_conveyor(pos, d):
-                c.build_conveyor(pos, d)
+        if my_pos.distance_squared(pos) <= 2:
+            nxt = self.path[self.index + 1]
+            d: Direction = pos.direction_to(nxt)
+            building_id = c.get_tile_building_id(nxt)
+            if building_id is None or c.get_team(building_id) == my_team:
+                building_id = c.get_tile_building_id(pos)
+                keep_gunner: bool = False
+                if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
+                    di: Direction = c.get_direction(building_id)
+                    cur: Position = pos
+                    if di in CARDINAL:
+                        for _ in range(3):
+                            cur = cur.add(di)
+                            building_id = c.get_tile_building_id(cur)
+                            if building_id is not None:
+                                keep_gunner = c.get_team() != my_team
+                                break
+                    else:
+                        for _ in range(2):
+                            cur = cur.add(di)
+                            building_id = c.get_tile_building_id(cur)
+                            if building_id is not None:
+                                keep_gunner = c.get_team() != my_team
+                                break
+
+                if not keep_gunner:
+                    if c.can_destroy(pos):
+                        c.destroy(pos)
+
+                    dx, dy = d.delta()
+                    if dx and dy:
+                        if c.can_build_bridge(pos, nxt):
+                            c.build_bridge(pos, nxt)
+                    else:
+                        if c.can_build_conveyor(pos, d):
+                            c.build_conveyor(pos, d)
+            else:
+                if c.can_build_gunner(pos, d):
+                    c.build_gunner(pos, d)
