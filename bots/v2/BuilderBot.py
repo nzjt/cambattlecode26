@@ -111,17 +111,7 @@ class BuilderBot(Unit):
                 if bb_id is not None and bb_id != my_id:
                     self.target_type = 0
         elif self.target_type == 3:
-            if c.is_in_vision(self.conveyor_manager.path[-1]):
-                dist = my_pos.distance_squared(self.target)
-                self.target_dist = min(self.target_dist, dist)
-
-                if self.target == self.home:
-                    if dist <= 5:
-                        self.target_type = 0
-                else:
-                    if dist <= 1:
-                        self.target_type = 0
-            else:
+            if self.conveyor_manager.done:
                 self.target_type = 0
 
         self.tile_manager.sense(c, self.home)
@@ -136,7 +126,7 @@ class BuilderBot(Unit):
                 self.target_dist = min(self.target_dist, dist)
 
                 if dist == 0:
-                    self.target = self.home.add(self.home.direction_to(my_pos))
+                    self.target = self.home
                     self.target_type = 3
                     self.target_dist = my_pos.distance_squared(self.target)
                     self.conveyor_manager = ConveyorManager(c, self.tile_manager, my_pos, self.target)
@@ -144,7 +134,7 @@ class BuilderBot(Unit):
                     building_id = c.get_tile_building_id(self.target)
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
                         harvester: Position = self.target
-                        self.target = self.home.add(self.home.direction_to(my_pos))
+                        self.target = self.home
                         self.target_type = 3
                         self.target_dist = my_pos.distance_squared(self.target)
                         self.conveyor_manager = ConveyorManager(c, self.tile_manager, harvester, self.target)
@@ -167,7 +157,8 @@ class BuilderBot(Unit):
             c.draw_indicator_line(my_pos, self.target, 0, 255, 0)
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 3:
-            self.conveyor_manager.update(c, self.movement, self.nav)
+            pass_ = self.tile_manager.pass_ & ~self.tile_manager.ally & ~self.tile_manager.enemy
+            self.conveyor_manager.update(c, self.movement, lambda pos: self.bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_))
             # if my_pos == self.conveyor_manager.path[0] and self.target.distance_squared(self.conveyor_manager.path[0]) == 1:
             #     if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
             #         for d in Direction:
