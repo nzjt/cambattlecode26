@@ -7,7 +7,7 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
-from AStar import AStar
+from AStarJPS import AStarJPS
 
 
 class BuilderBot(Unit):
@@ -156,9 +156,9 @@ class BuilderBot(Unit):
                         self.tile_manager.ban_harvester[yi][xi] = True
                         self.target_type = 0
                     else:
-                        a_star = AStar(self.tile_manager, c.get_map_width(), c.get_map_height())
+                        a_star = AStarJPS(self.tile_manager)
                         a_star.compute(self.conveyor_manager.path[0], self.target)
-                        a_star.find_path(self.conveyor_manager.path[0])
+                        # a_star.find_path(self.conveyor_manager.path[0])
                         path = a_star.path
                         for i in range(1, len(path)):
                             c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)

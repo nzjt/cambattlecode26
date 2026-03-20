@@ -16,309 +16,317 @@ class AStarJPS:
         Direction.NORTHWEST
     )
 
-    def __init__(self, tile_manager: TileManager, W: int, H: int):
+    def __init__(self, tile_manager: TileManager):
         self.tile_manager = tile_manager
-        INF = AStar.INF
+        INF = AStarJPS.INF
         self.g: list[list[int]] = [[INF if e else -1 for e in row] for row in self.tile_manager.env_grid]
+        self.par: list[list[tuple[int, int] | None]] = [[None] * len(self.g[0]) for _ in range(len(self.g))]
         self.path: list[Position] = []
 
     def compute(self, start: Position, end: Position):
         env_grid = self.tile_manager.env_grid
-        INF = AStar.INF
         g = self.g
-        H = AStar.H
+        par = self.par
 
-        queue: list[list[tuple[int, int, int]]] = [[], [], []]
+        queue: list[list[tuple[int, int, int]]] = [[] for _ in range(500)]
         x, y = end
-        temp = env_grid[y][x]
         env_grid[y][x] = 1
         xi, yi = start
         g[yi][xi] = 0
-        i = H[yi][xi] % 3
-        queue[i].append((xi, yi, 8))
 
-        def to_O(xi, yi):
-            gj = g[yi][xi] + 1
+        def add(xj: int, yj: int, gi: int, d: int):
+            if gi < g[yj][xj]:
+                g[yj][xj] = gi
+                queue[g[yj][xj] + max(abs(xj - x), abs(yj - y))].append((xj, yj, d))
+                par[yj][xj] = (xi, yi)
 
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 0))
+        def scan_N(xj, yj) -> tuple[int, int] | None:
+            while True:
+                yj -= 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj][xj - 1] == -1 and g[yj - 1][xj - 1] != -1 or g[yj][xj + 1] == -1 and g[yj - 1][xj + 1] != -1:
+                    return xj, yj
 
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+        def scan_E(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj += 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj - 1][xj] == -1 and g[yj - 1][xj + 1] != -1 or g[yj + 1][xj] == -1 and g[yj + 1][xj + 1] != -1:
+                    return xj, yj
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 2))
+        def scan_S(xj, yj) -> tuple[int, int] | None:
+            while True:
+                yj += 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj][xj - 1] == -1 and g[yj + 1][xj - 1] != -1 or g[yj][xj + 1] == -1 and g[yj + 1][xj + 1] != -1:
+                    return xj, yj
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
+        def scan_W(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj -= 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj - 1][xj] == -1 and g[yj - 1][xj - 1] != -1 or g[yj + 1][xj] == -1 and g[yj + 1][xj - 1] != -1:
+                    return xj, yj
 
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 4))
+        def scan_NE(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj += 1
+                yj -= 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj][xj - 1] == -1 and g[yj - 1][xj - 1] != -1 or g[yj + 1][xj] == -1 and g[yj + 1][xj + 1] != -1:
+                    return xj, yj
+                if scan_N(xj, yj) or scan_E(xj, yj):
+                    return xj, yj
 
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
+        def scan_SE(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj += 1
+                yj += 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj - 1][xj] == -1 and g[yj - 1][xj + 1] != -1 or g[yj][xj - 1] == -1 and g[yj + 1][xj - 1] != -1:
+                    return xj, yj
+                if scan_E(xj, yj) or scan_S(xj, yj):
+                    return xj, yj
 
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 6))
+        def scan_SW(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj -= 1
+                yj += 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj][xj + 1] == -1 and g[yj + 1][xj + 1] != -1 or g[yj - 1][xj] == -1 and g[yj - 1][xj - 1] != -1:
+                    return xj, yj
+                if scan_S(xj, yj) or scan_W(xj, yj):
+                    return xj, yj
 
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
+        def scan_NW(xj, yj) -> tuple[int, int] | None:
+            while True:
+                xj -= 1
+                yj -= 1
+                if xj == x and yj == y:
+                    return xj, yj
+                if g[yj][xj] == -1:
+                    return
+                if g[yj + 1][xj] == -1 and g[yj + 1][xj - 1] != -1 or g[yj][xj + 1] == -1 and g[yj - 1][xj + 1] != -1:
+                    return xj, yj
+                if scan_W(xj, yj) or scan_N(xj, yj):
+                    return xj, yj
 
-        def to_N(xi, yi):
-            gj = g[yi][xi] + 1
+        jp = scan_N(xi, yi)
+        if jp:
+            add(*jp, yi - jp[1], 0)
+        jp = scan_NE(xi, yi)
+        if jp:
+            add(*jp, jp[0] - xi, 1)
+        jp = scan_E(xi, yi)
+        if jp:
+            add(*jp, jp[0] - xi, 2)
+        jp = scan_SE(xi, yi)
+        if jp:
+            add(*jp, jp[0] - xi, 3)
+        jp = scan_S(xi, yi)
+        if jp:
+            add(*jp, jp[1] - yi, 4)
+        jp = scan_SW(xi, yi)
+        if jp:
+            add(*jp, xi - jp[0], 5)
+        jp = scan_W(xi, yi)
+        if jp:
+            add(*jp, xi - jp[0], 6)
+        jp = scan_NW(xi, yi)
+        if jp:
+            add(*jp, xi - jp[0], 7)
 
-            xi -= 1
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
+        def expand_N(xi, yi):
+            gi = g[yi][xi]
 
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 0))
+            jp = scan_N(xi, yi)
+            if jp:
+                add(*jp, gi + yi - jp[1], 0)
+            if g[yi][xi - 1] == -1:
+                jp = scan_NW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 7)
+            if g[yi][xi + 1] == -1:
+                jp = scan_NE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 1)
 
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+        def expand_NE(xi, yi):
+            gi = g[yi][xi]
 
-        def to_NE(xi, yi):
-            gj = g[yi][xi] + 1
+            jp = scan_N(xi, yi)
+            if jp:
+                add(*jp, gi + yi - jp[1], 0)
+            jp = scan_NE(xi, yi)
+            if jp:
+                add(*jp, gi + jp[0] - xi, 1)
+            jp = scan_E(xi, yi)
+            if jp:
+                add(*jp, gi + jp[0] - xi, 2)
+            if g[yi][xi - 1] == -1:
+                jp = scan_NW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 7)
+            if g[yi + 1][xi] == -1:
+                jp = scan_SE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 3)
 
-            xi -= 1
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
+        def expand_E(xi, yi):
+            gi = g[yi][xi]
 
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 0))
+            jp = scan_E(xi, yi)
+            if jp:
+                add(*jp, gi + jp[0] - xi, 2)
+            if g[yi - 1][xi] == -1:
+                jp = scan_NE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 1)
+            if g[yi + 1][xi] == -1:
+                jp = scan_SE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 3)
 
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+        def expand_SE(xi, yi):
+            gi = g[yi][xi]
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 2))
+            jp = scan_E(xi, yi)
+            if jp:
+                add(*jp, gi + jp[0] - xi, 2)
+            jp = scan_SE(xi, yi)
+            if jp:
+                add(*jp, gi + jp[0] - xi, 3)
+            jp = scan_S(xi, yi)
+            if jp:
+                add(*jp, gi + jp[1] - yi, 4)
+            if g[yi - 1][xi] == -1:
+                jp = scan_NE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 1)
+            if g[yi][xi - 1] == -1:
+                jp = scan_SW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 5)
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
+        def expand_S(xi, yi):
+            gi = g[yi][xi]
 
-        def to_E(xi, yi):
-            gj = g[yi][xi] + 1
+            jp = scan_S(xi, yi)
+            if jp:
+                add(*jp, gi + jp[1] - yi, 4)
+            if g[yi][xi + 1] == -1:
+                jp = scan_SE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 3)
+            if g[yi][xi - 1] == -1:
+                jp = scan_SW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 5)
 
-            xi += 1
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+        def expand_SW(xi, yi):
+            gi = g[yi][xi]
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 2))
+            jp = scan_S(xi, yi)
+            if jp:
+                add(*jp, gi + jp[1] - yi, 4)
+            jp = scan_SW(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 5)
+            jp = scan_W(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 6)
+            if g[yi][xi + 1] == -1:
+                jp = scan_SE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 3)
+            if g[yi - 1][xi] == -1:
+                jp = scan_NW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 7)
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
+        def expand_W(xi, yi):
+            gi = g[yi][xi]
 
-        def to_SE(xi, yi):
-            gj = g[yi][xi] + 1
+            jp = scan_W(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 6)
+            jp = scan_NW(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 7)
+            if g[yi + 1][xi] == -1:
+                jp = scan_SW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 5)
+            if g[yi - 1][xi] == -1:
+                jp = scan_NW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 7)
 
-            xi += 1
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+        def expand_NW(xi, yi):
+            gi = g[yi][xi]
 
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 2))
-
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 4))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
-
-        def to_S(xi, yi):
-            gj = g[yi][xi] + 1
-
-            xi += 1
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 4))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
-
-        def to_SW(xi, yi):
-            gj = g[yi][xi] + 1
-
-            xi += 1
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 3))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 4))
-
-            xi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 6))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
-
-        def to_W(xi, yi):
-            gj = g[yi][xi] + 1
-
-            xi -= 1
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 6))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
-
-        def to_NW(xi, yi):
-            gj = g[yi][xi] + 1
-
-            xi -= 1
-            yi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 5))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 6))
-
-            yi -= 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 7))
-
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 0))
-
-            xi += 1
-            if gj < g[yi][xi]:
-                g[yi][xi] = gj
-                queue[(gj + H[yi][xi]) % 3].append((xi, yi, 1))
+            jp = scan_W(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 6)
+            jp = scan_NW(xi, yi)
+            if jp:
+                add(*jp, gi + xi - jp[0], 7)
+            jp = scan_N(xi, yi)
+            if jp:
+                add(*jp, gi + yi - jp[1], 0)
+            if g[yi + 1][xi] == -1:
+                jp = scan_SW(xi, yi)
+                if jp:
+                    add(*jp, gi + xi - jp[0], 5)
+            if g[yi][xi + 1] == -1:
+                jp = scan_NE(xi, yi)
+                if jp:
+                    add(*jp, gi + jp[0] - xi, 1)
 
         f = [
-            to_N,
-            to_NE,
-            to_E,
-            to_SE,
-            to_S,
-            to_SW,
-            to_W,
-            to_NW,
-            to_O
+            expand_N,
+            expand_NE,
+            expand_E,
+            expand_SE,
+            expand_S,
+            expand_SW,
+            expand_W,
+            expand_NW
         ]
 
-        while True:
+        for i in range(max(abs(xi - x), abs(yi - y)), 500):
             for xi, yi, d in queue[i]:
                 if xi == x and yi == y:
-                    env_grid[y][x] = temp
-                    return
-
+                    print(i)
+                    break
                 f[d](xi, yi)
+            else:
+                continue
+            break
 
-            queue[i] = []
-            i = (i + 1) % 3
-
-    def find_path(self, pos: Position):
-        self.path = [pos]
-        path = self.path
-        print(path)
-        g = self.g
-        DIRECTIONS = AStar.DIRECTIONS
-
-        if not g[pos.y][pos.x]:
-            return
-
-        prev: Direction = Direction.NORTH
-        while True:
-            mn = pos.add(prev)
-            mn_g = g[mn.y][mn.x]
-            if mn_g == -1:
-                mn_g = AStar.INF
-            for d in DIRECTIONS:
-                cur = pos.add(d)
-                gi = g[cur.y][cur.x]
-                if 0 <= gi < mn_g:
-                    mn = cur
-                    mn_g = gi
-                    prev = d
-
-            path.append(pos := mn)
-            if not mn_g:
-                break
+        self.path = [end]
+        path: list[Position] = self.path
+        while path[-1] != start:
+            xi, yi = path[-1]
+            path.append(Position(*par[yi][xi]))
