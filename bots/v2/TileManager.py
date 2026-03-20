@@ -58,7 +58,7 @@ class TileManager:
                     (grid[y + 3] << shift & only_9) << 70 |
                     (grid[y + 4] << shift & only_9) << 80)
 
-    def sense(self, c: Controller):
+    def sense(self, c: Controller, home: Position):
         get_tile_building_id = c.get_tile_building_id
         get_tile_env = c.get_tile_env
         get_entity_type = c.get_entity_type
@@ -131,7 +131,8 @@ class TileManager:
                         if self.ban_harvester[yi][xi]:
                             continue
 
-                        print("test", pos)
+                        if pos.distance_squared(home) <= 5:
+                            continue
                         has_space, has_conveyor = False, False
                         for d in CARDINAL:
                             cur: Position = pos.add(d)
@@ -153,7 +154,6 @@ class TileManager:
                         if has_conveyor or not has_space:
                             continue
 
-                        print("good")
                         self.build_harvester[yi][xi] = True
 
         self.ally = ally & -0x100000000001

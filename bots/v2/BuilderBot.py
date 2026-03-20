@@ -124,7 +124,7 @@ class BuilderBot(Unit):
             else:
                 self.target_type = 0
 
-        self.tile_manager.sense(c)
+        self.tile_manager.sense(c, self.home)
         self.bfs.update(c, self.conveyor_manager)
 
         if self.target_type == 2:
@@ -218,6 +218,7 @@ class BuilderBot(Unit):
                             len(self.conveyor_manager.path) > 1 and
                             c.get_team(c.get_tile_building_id(self.conveyor_manager.path[0])) == my_team)
 
+                print("build", do_build, self.conveyor_manager.path)
                 if my_pos.distance_squared(self.conveyor_manager.path[-1]) > 1:
                     if not do_build or not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
                         if do_build:
