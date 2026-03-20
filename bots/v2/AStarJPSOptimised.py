@@ -18,9 +18,9 @@ class AStarJPSOptimised:
         par = self.par
 
         queue: list[list[tuple[int, int, int]]] = [[] for _ in range(500)]
-        x, y = end
+        x, y = start
         g[y][x] = AStarJPSOptimised.INF
-        xi, yi = start
+        xi, yi = end
         g[yi][xi] = 0
 
         def add(xj: int, yj: int, gi: int, d: int):
@@ -420,7 +420,7 @@ class AStarJPSOptimised:
                 continue
             break
 
-        self.path = [end]
+        self.path = [start]
         path: list[Position] = self.path
         while True:
             xi, yi = path[-1]
