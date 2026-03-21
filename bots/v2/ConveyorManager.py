@@ -200,14 +200,14 @@ class ConveyorManager:
                             cur = cur.add(di)
                             building_id = c.get_tile_building_id(cur)
                             if building_id is not None:
-                                keep_gunner = c.get_team() != my_team
+                                keep_gunner = c.get_team(building_id) != my_team
                                 break
                     else:
                         for _ in range(2):
                             cur = cur.add(di)
                             building_id = c.get_tile_building_id(cur)
                             if building_id is not None:
-                                keep_gunner = c.get_team() != my_team
+                                keep_gunner = c.get_team(building_id) != my_team
                                 break
 
                 if not keep_gunner and not c.get_action_cooldown():
