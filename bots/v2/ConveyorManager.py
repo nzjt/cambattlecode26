@@ -101,7 +101,7 @@ class ConveyorManager:
                     break
                 if c.get_team(building_id) == my_team:
                     e_type = c.get_entity_type(building_id)
-                    if e_type == EntityType.CONVEYOR:
+                    if e_type in CONVEYOR:
                         if c.get_direction(building_id) == self.path[self.index].direction_to(self.path[self.index + 1]):
                             self.index += 1
                             continue

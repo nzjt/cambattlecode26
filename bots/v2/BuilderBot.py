@@ -7,6 +7,7 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
+from consts import *
 
 
 class BuilderBot(Unit):
@@ -31,7 +32,7 @@ class BuilderBot(Unit):
             retargets: list[Position] = []
             for pos in c.get_nearby_tiles():
                 building_id = c.get_tile_building_id(pos)
-                if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) == my_team:
+                if c.get_entity_type(building_id) in MONOCHILD_CONVEYOR and c.get_team(building_id) == my_team:
                     xi, yi = pos
                     if self.conveyor_manager.path_index[yi][xi] >= self.conveyor_manager.index:
                         good = True
@@ -42,7 +43,7 @@ class BuilderBot(Unit):
                                 good = False
                                 break
                             e_type = c.get_entity_type(building_id)
-                            if e_type == EntityType.CONVEYOR:
+                            if e_type in CONVEYOR:
                                 cur = cur.add(c.get_direction(building_id))
                             elif e_type == EntityType.BRIDGE:
                                 cur = c.get_bridge_target(building_id)
@@ -114,6 +115,7 @@ class BuilderBot(Unit):
                 self.target_type = 0
 
             if self.target_type:
+                print("hm", self.target)
                 dist = my_pos.distance_squared(self.target)
                 self.target_dist = min(self.target_dist, dist)
 

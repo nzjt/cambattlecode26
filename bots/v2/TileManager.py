@@ -1,5 +1,5 @@
 from cambc import *
-from consts import CARDINAL
+from consts import *
 
 
 class TileManager:
@@ -8,10 +8,6 @@ class TileManager:
         EntityType.SPLITTER,
         EntityType.BRIDGE,
         EntityType.ARMOURED_CONVEYOR
-    }
-    ORES = {
-        Environment.ORE_TITANIUM,
-        Environment.ORE_AXIONITE
     }
     ENV_MAP = {
         Environment.WALL: 0,
@@ -89,7 +85,6 @@ class TileManager:
         ROAD = EntityType.ROAD
         MARKER = EntityType.MARKER
         CORE = EntityType.CORE
-        ORES = TileManager.ORES
         ENV_MAP = TileManager.ENV_MAP
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -126,7 +121,7 @@ class TileManager:
                 else:
                     enemy |= 1 << (dx + dy * 10 + 44)
 
-            if env in ORES:
+            if env >= 2:
                 if building_id is not None:
                     e_type = get_entity_type(building_id)
                     if e_type == EntityType.HARVESTER and pos.distance_squared(my_pos) <= 13:
@@ -140,16 +135,14 @@ class TileManager:
                         for d in CARDINAL:
                             cur: Position = pos.add(d)
                             if 0 <= cur.x <= W - 1 and 0 <= cur.y <= H - 1:
-                                if c.get_tile_env(cur) == Environment.WALL:
-                                    continue
                                 building_id = c.get_tile_building_id(cur)
                                 if building_id is None:
-                                    has_space = True
+                                    has_space |= c.get_tile_env(cur) == Environment.EMPTY
                                 else:
                                     if c.get_team(building_id) != my_team:
                                         continue
                                     e_type = c.get_entity_type(building_id)
-                                    if e_type == EntityType.CONVEYOR:
+                                    if e_type in CONVEYOR_VARIANT:
                                         has_conveyor = True
                                         break
                                     elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
@@ -157,6 +150,7 @@ class TileManager:
                         if has_conveyor or not has_space:
                             continue
 
+                        print("save", pos)
                         self.build_harvester[yi][xi] = True
 
         self.ally = ally & -0x100000000001
