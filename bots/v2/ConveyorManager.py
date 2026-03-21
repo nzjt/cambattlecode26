@@ -44,12 +44,11 @@ class ConveyorManager:
         self.on_path[pos.y][pos.x] = True
         return True
 
-    def update(self, c: Controller, movement: Movement, bfs_adj_exc):
+    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs):
         my_id = c.get_id()
         my_team = c.get_team()
         my_pos = c.get_position(my_id)
 
-        print("yo")
         while self.index < len(self.path) - 1:
             pos: Position = self.path[self.index]
             if c.is_in_vision(pos):
@@ -68,7 +67,6 @@ class ConveyorManager:
                             continue
             break
 
-        print("yo")
         if self.index == len(self.path) - 1:
             # Wow we're done
             pos: Position = self.path[0]
@@ -100,7 +98,6 @@ class ConveyorManager:
                 self.done = True
             return
 
-        print("yo")
         do_build: bool = False
         if c.is_in_vision(self.path[0]):
             building_id = c.get_tile_building_id(self.path[0])
@@ -108,9 +105,19 @@ class ConveyorManager:
         wealthy = c.get_global_resources()[0] >= c.get_harvester_cost()[0]
 
         pos: Position = self.path[self.index]
+        nxt = self.path[self.index + 1]
+        need_gunner = c.is_in_vision(nxt) and c.get_team(c.get_tile_building_id(nxt)) != my_team
         if not c.get_move_cooldown() and (not do_build or wealthy):
-            d: Direction = bfs_adj_exc(pos)
-            if d != Direction.CENTRE:
+            pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
+            if need_gunner:
+                d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+            else:
+                d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+            if d is None:
+                # Can't reach => done?
+                self.done = True
+                return
+            elif d != Direction.CENTRE:
                 if c.can_move(d):
                     movement.move(d)
                 else:
@@ -123,11 +130,15 @@ class ConveyorManager:
             c.build_harvester(self.path[0])
 
         if my_pos.distance_squared(pos) <= 2:
-            nxt = self.path[self.index + 1]
             d: Direction = pos.direction_to(nxt)
-            building_id = c.get_tile_building_id(nxt)
-            if building_id is None or c.get_team(building_id) == my_team:
-                building_id = c.get_tile_building_id(pos)
+            building_id = c.get_tile_building_id(pos)
+            if need_gunner:
+                if c.get_entity_type(building_id) != EntityType.GUNNER and c.can_destroy(pos):
+                    c.destroy(pos)
+
+                if c.can_build_gunner(pos, d):
+                    c.build_gunner(pos, d)
+            else:
                 keep_gunner: bool = False
                 if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
                     di: Direction = c.get_direction(building_id)
@@ -158,6 +169,3 @@ class ConveyorManager:
                     else:
                         if c.can_build_conveyor(pos, d):
                             c.build_conveyor(pos, d)
-            else:
-                if c.can_build_gunner(pos, d):
-                    c.build_gunner(pos, d)

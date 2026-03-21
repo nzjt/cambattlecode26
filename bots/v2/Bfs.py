@@ -51,6 +51,25 @@ class Bfs:
             if target & ADJ:
                 return Bfs.get_move(target & ADJ)
 
+    def bfs_to_pos(self, dx: int, dy: int, pass_: int):
+        if -4 <= dx <= 4 and -4 <= dy <= 4:
+            target = 1 << (dx + dy * 10 + 44)
+
+            if target >> 44 & 1:
+                return Direction.CENTRE
+
+            ADJ = Bfs.ADJ
+            if target & ADJ:
+                return Bfs.get_move(target & ADJ)
+
+            for _ in range(15):
+                target |= target << 1 | target >> 1
+                target |= target << 10 | target >> 10
+                target &= pass_
+
+                if target & ADJ:
+                    return Bfs.get_move(target & ADJ)
+
     def bfs_adj_exc(self, dx: int, dy: int, pass_: int) -> Direction | None:
         if -4 <= dx <= 4 and -4 <= dy <= 4:
             centre = 1 << (dx + dy * 10 + 44)
