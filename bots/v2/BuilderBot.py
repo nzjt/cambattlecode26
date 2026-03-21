@@ -17,7 +17,7 @@ class BuilderBot(Unit):
         self.nav: Nav = Bug0Better()
         self.home: Position | None = None
         self.target: Position | None = None
-        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home
+        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
@@ -27,8 +27,40 @@ class BuilderBot(Unit):
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
         my_team = c.get_team(my_id)
+        W, H = c.get_map_width(), c.get_map_height()
+        x, y = my_pos
 
-        if self.target_type == 3:
+        if self.target_type == 4:
+            self.target_type = 0
+
+            dist = my_pos.distance_squared(self.target)
+            xi, yi = self.target
+            if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
+                building_id = c.get_tile_building_id(self.target)
+                if c.get_team(building_id) != my_team and c.get_entity_type(building_id) == EntityType.HARVESTER:
+                    has_space, has_enemy = False, False
+                    for d in CARDINAL:
+                        nxt = self.target.add(d)
+                        if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                            building_id = c.get_tile_building_id(nxt)
+                            if building_id is None:
+                                has_space = True
+                            elif c.get_team(building_id) == my_team:
+                                e_type = c.get_entity_type(building_id)
+                                if e_type == EntityType.SENTINEL:
+                                    has_enemy = False
+                                    break
+                                else:
+                                    has_space |= e_type in UNIMPORTANT
+                            else:
+                                has_enemy |= c.get_entity_type(building_id) != EntityType.MARKER
+
+                    if has_space and has_enemy:
+                        self.target_type = 4
+
+        if self.target_type == 4:
+            pass
+        elif self.target_type == 3:
             retargets: list[Position] = []
             for pos in c.get_nearby_tiles():
                 building_id = c.get_tile_building_id(pos)
@@ -67,25 +99,51 @@ class BuilderBot(Unit):
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
                 if env == Environment.ORE_TITANIUM or env == Environment.ORE_AXIONITE:
-                    if not self.tile_manager.build_harvester[pos.y][pos.x]:
-                        continue
+                    building_id = c.get_tile_building_id(pos)
+                    if c.get_entity_type(building_id) == EntityType.HARVESTER:
+                        dist = my_pos.distance_squared(pos)
+                        xi, yi = pos
+                        if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
+                            has_space, has_enemy = False, False
+                            for d in CARDINAL:
+                                nxt = pos.add(d)
+                                if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                                    building_id = c.get_tile_building_id(nxt)
+                                    if building_id is None:
+                                        has_space = True
+                                    elif c.get_team(building_id) == my_team:
+                                        e_type = c.get_entity_type(building_id)
+                                        if e_type == EntityType.SENTINEL:
+                                            has_enemy = False
+                                            break
+                                        else:
+                                            has_space |= e_type in UNIMPORTANT
+                                    else:
+                                        has_enemy |= c.get_entity_type(building_id) != EntityType.MARKER
 
-                    if c.get_tile_builder_bot_id(pos) is not None:
-                        continue
+                            if has_space and has_enemy:
+                                self.target = pos
+                                self.target_type = 4
+                                break
 
-                    dist = my_pos.distance_squared(pos)
-                    if self.target_type == 2:
-                        if dist >= self.target_dist:
-                            break
+                    if self.tile_manager.build_harvester[pos.y][pos.x] and self.target_type <= 2:
+                        if c.get_tile_builder_bot_id(pos) is not None:
+                            continue
 
-                    self.target = pos
-                    self.target_type = 2
-                    self.target_dist = dist
-                    self.conveyor_manager = None
+                        dist = my_pos.distance_squared(pos)
+                        if self.target_type == 2:
+                            if dist >= self.target_dist:
+                                break
+
+                        self.target = pos
+                        self.target_type = 2
+                        self.target_dist = dist
+                        self.conveyor_manager = None
 
     def run(self, c: Controller):
         my_id = c.get_id()
-        my_pos = c.get_position(my_id)
+        my_pos = c.get_position()
+        my_team = c.get_team()
 
         if self.home is None:
             self.home = c.get_position(c.get_tile_building_id(my_pos))
@@ -152,3 +210,42 @@ class BuilderBot(Unit):
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 3:
             self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs)
+        elif self.target_type == 4:
+            W, H = c.get_map_width(), c.get_map_height()
+            sentinel_targets: list[Position] = []
+            for d in CARDINAL:
+                nxt = self.target.add(d)
+                if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                    building_id = c.get_tile_building_id(nxt)
+                    if building_id is None or c.get_team(building_id) == my_team and c.get_entity_type(building_id) in UNIMPORTANT:
+                        sentinel_targets.append(nxt)
+
+            x, y = my_pos
+            deltas = [(xi - x, yi - y) for xi, yi in sentinel_targets]
+            d: Direction = self.bfs.bfs_adj_exc_multi(deltas, self.tile_manager.pass_)
+
+            if d is None:
+                d = self.bfs.bfs_adj_exc_multi(deltas, self.tile_manager.pass_ | self.tile_manager.buildable)
+
+            if d is None:
+                # :(
+                pass
+            elif d != Direction.CENTRE and self.movement.can_move(d):
+                self.movement.move(d)
+                my_pos = c.get_position()
+            c.draw_indicator_line(my_pos, self.target, 255, 128, 0)
+
+            if c.get_global_resources()[0] >= c.get_sentinel_cost()[0]:
+                for target in sentinel_targets:
+                    if my_pos.distance_squared(target) <= 2:
+                        if c.can_destroy(target):
+                            c.destroy(target)
+                        if c.can_build_sentinel(target, Direction.NORTH):
+                            d = target.direction_to(self.target)
+                            if self.target.add(d.rotate_left()).distance_squared(self.home) > self.target.add(d.rotate_right()).distance_squared(self.home):
+                                d = d.rotate_left()
+                            else:
+                                d = d.rotate_right()
+                            c.build_sentinel(target, d)
+                            self.target_type = 0
+                            break

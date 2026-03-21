@@ -1,3 +1,5 @@
+from encodings.punycode import selective_find
+
 from cambc import *
 from TileManager import TileManager
 import random
@@ -8,32 +10,33 @@ class Bfs:
 
     def __init__(self, tile_manager: TileManager):
         self.tile_manager = tile_manager
-        self.conveyor_reach: int = 0
+        self.reach: int = 0
 
     def update(self, c: Controller, conveyor_manager):
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
 
-        if conveyor_manager is not None:
-            pass_ = self.tile_manager.buildable
-            xi, yi = conveyor_manager.path[-1]
-            dx = xi - my_pos.x
-            dy = yi - my_pos.y
-            if -4 <= dx <= 4 and -4 <= dy <= 4:
-                conveyor_reach = 1 << (dx + dy * 10 + 44)
-                for _ in range(15):
-                    conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
-                    conveyor_reach &= pass_
+        pass_ = self.tile_manager.pass_ | self.tile_manager.buildable
+        reach: int = 1 << 44
+        for _ in range(15):
+            reach |= reach << 1 | reach >> 1
+            reach |= reach << 10 | reach >> 10
+            reach &= pass_
 
-                conveyor_reach |= conveyor_reach << 1 | conveyor_reach >> 1 | conveyor_reach << 10 | conveyor_reach >> 10
-                self.conveyor_reach = conveyor_reach
-            else:
-                self.conveyor_reach = 0
+        self.reach = reach
 
-    def can_conveyor_reach(self, dx: int, dy: int) -> int:
+    def can_reach(self, dx: int, dy: int) -> int:
         if -4 <= dx <= 4 and -4 <= dy <= 4:
-            return self.conveyor_reach >> (dx + dy * 10 + 44) & 1
-        return False
+            return self.reach >> (dx + dy * 10 + 44) & 1
+        return 0
+
+    def can_reach_adj(self, dx: int, dy: int) -> int:
+        if -4 <= dx <= 4 and -4 <= dy <= 4:
+            target: int = 1 << (dx + dy * 10 + 44)
+            target |= target << 1 | target >> 1
+            target |= target << 10 | target >> 10
+            return self.reach & target
+        return 0
 
     def bfs(self, target: int, pass_: int) -> Direction | None:
         if target >> 44 & 1:
@@ -94,6 +97,32 @@ class Bfs:
 
                 if target & ADJ:
                     return Bfs.get_move(target & ADJ)
+
+    @staticmethod
+    def bfs_adj_exc_multi(targets: list[tuple[int, int]], pass_: int) -> Direction | None:
+        target: int = 0
+        for dx, dy in targets:
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                centre = 1 << (dx + dy * 10 + 44)
+                adj = centre
+                adj |= adj << 1 | adj >> 1
+                adj |= adj << 10 | adj >> 10
+                target |= adj & pass_ & ~centre
+
+        if target >> 44 & 1:
+            return Direction.CENTRE
+
+        ADJ = Bfs.ADJ
+        if target & ADJ:
+            return Bfs.get_move(target & ADJ)
+
+        for _ in range(15):
+            target |= target << 1 | target >> 1
+            target |= target << 10 | target >> 10
+            target &= pass_
+
+            if target & ADJ:
+                return Bfs.get_move(target & ADJ)
 
     @staticmethod
     def closest_start(start: int, end: int, pass_: int) -> list[tuple[int, int]]:

@@ -2,6 +2,10 @@ from cambc import *
 
 
 CARDINAL = (Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST)
+UNIMPORTANT = {
+    EntityType.ROAD,
+    EntityType.MARKER
+}
 CONVEYOR = {
     EntityType.CONVEYOR,
     EntityType.ARMOURED_CONVEYOR

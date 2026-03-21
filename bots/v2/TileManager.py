@@ -150,7 +150,6 @@ class TileManager:
                         if has_conveyor or not has_space:
                             continue
 
-                        print("save", pos)
                         self.build_harvester[yi][xi] = True
 
         self.ally = ally & -0x100000000001

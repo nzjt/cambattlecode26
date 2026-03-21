@@ -4,9 +4,16 @@ from Unit import Unit
 from Core import Core
 from BuilderBot import BuilderBot
 from Gunner import Gunner
+from Sentinel import Sentinel
 
 
 class Player:
+    CLASS = {
+        EntityType.BUILDER_BOT: BuilderBot,
+        EntityType.GUNNER: Gunner,
+        EntityType.SENTINEL: Sentinel,
+        EntityType.CORE: Core
+    }
     def __init__(self):
         self.unit: Unit | None = None
 
@@ -14,12 +21,7 @@ class Player:
         if self.unit is None:
             random.seed(c.get_id())
             my_type = c.get_entity_type(c.get_id())
-            if my_type == EntityType.BUILDER_BOT:
-                self.unit = BuilderBot()
-            elif my_type == EntityType.GUNNER:
-                self.unit = Gunner()
-            elif my_type == EntityType.CORE:
-                self.unit = Core()
+            self.unit = Player.CLASS[my_type]()
 
         try:
             self.unit.run(c)
