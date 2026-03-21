@@ -136,6 +136,30 @@ class BuilderBot(Unit):
         self.sense(c)
         self.movement.upd(c)
 
+        core: Position = self.home
+        if not c.is_in_vision(core):
+            core = core.add(self.home.direction_to(my_pos))
+
+        heal_core: bool = False
+        if c.is_in_vision(core):
+            building_id = c.get_tile_building_id(core)
+            if c.get_hp(building_id) < c.get_max_hp(building_id):
+                pass_ = (self.tile_manager.pass_ | self.tile_manager.buildable) & ~self.tile_manager.ally & ~self.tile_manager.enemy
+                if core == self.home:
+                    d = self.bfs.bfs_adj_exc(core.x - my_pos.x, core.y - my_pos.y, pass_)
+                else:
+                    d = self.bfs.bfs_to_pos(core.x - my_pos.x, core.y - my_pos.y, pass_)
+                if d is not None:
+                    heal_core = True
+                    if d != Direction.CENTRE and self.movement.can_move(d):
+                        self.movement.move(d)
+
+        if (c.get_hp(my_id) < c.get_max_hp(my_id) or heal_core) and c.can_heal(my_pos):
+            c.heal(my_pos)
+
+        if heal_core:
+            return
+
         if c.get_hp(my_id) < c.get_max_hp(my_id) and c.can_heal(my_pos):
             c.heal(my_pos)
 

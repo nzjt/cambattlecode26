@@ -17,7 +17,7 @@ class BuilderBot(Unit):
         self.nav: Nav = Bug0Better()
         self.home: Position | None = None
         self.target: Position | None = None
-        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors
+        self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors, 5: repair conveyor
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
@@ -29,6 +29,32 @@ class BuilderBot(Unit):
         my_team = c.get_team(my_id)
         W, H = c.get_map_width(), c.get_map_height()
         x, y = my_pos
+
+        def needs_repair(pos: Position, trustworthy: bool = False) -> bool:
+            if c.is_in_vision(pos):
+                building_id = c.get_tile_building_id(pos)
+                if c.get_team(building_id) == my_team:
+                    e_type = c.get_entity_type(building_id)
+                    if e_type in CONVEYOR:
+                        if c.get_stored_resource(building_id) is not None:
+                            d: Direction = c.get_direction(building_id)
+                            nxt = pos.add(d)
+                            if c.is_in_vision(nxt):
+                                building_id = c.get_tile_building_id(nxt)
+                                if building_id is not None and c.get_team(building_id) == my_team and c.get_entity_type(building_id) not in UNIMPORTANT:
+                                    return False
+                                if not trustworthy:
+                                    for e in Direction:
+                                        nxt = pos.add(e)
+                                        if c.is_in_vision(nxt):
+                                            bb_id = c.get_tile_builder_bot_id(nxt)
+                                            if bb_id is not None and bb_id != my_id and c.get_team(bb_id) == my_team:
+                                                return False
+                                return True
+                            return trustworthy
+                return False
+            else:
+                return trustworthy
 
         if self.target_type == 4:
             self.target_type = 0
@@ -57,8 +83,13 @@ class BuilderBot(Unit):
 
                     if has_space and has_enemy:
                         self.target_type = 4
+        elif self.target_type == 5:
+            if self.conveyor_manager is None and not needs_repair(self.target, True):
+                self.target_type = 0
 
-        if self.target_type == 4:
+        if self.target_type == 5:
+            pass
+        elif self.target_type == 4:
             pass
         elif self.target_type == 3:
             retargets: list[Position] = []
@@ -133,12 +164,20 @@ class BuilderBot(Unit):
                         dist = my_pos.distance_squared(pos)
                         if self.target_type == 2:
                             if dist >= self.target_dist:
-                                break
+                                continue
 
                         self.target = pos
                         self.target_type = 2
                         self.target_dist = dist
                         self.conveyor_manager = None
+
+                if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
+                    # Need to repair!
+                    print("rep", pos)
+                    self.target = pos
+                    self.target_type = 5
+                    self.conveyor_manager = None
+                    break
 
     def run(self, c: Controller):
         my_id = c.get_id()
@@ -164,6 +203,9 @@ class BuilderBot(Unit):
                 self.target_type = 0
             else:
                 self.conveyor_manager.update_index(c)
+        elif self.target_type == 5:
+            if self.conveyor_manager is not None:
+                self.conveyor_manager.update_index(c)
 
         self.tile_manager.sense(c, self.home)
         self.bfs.update(c, self.conveyor_manager)
@@ -173,7 +215,6 @@ class BuilderBot(Unit):
                 self.target_type = 0
 
             if self.target_type:
-                print("hm", self.target)
                 dist = my_pos.distance_squared(self.target)
                 self.target_dist = min(self.target_dist, dist)
 
@@ -194,8 +235,29 @@ class BuilderBot(Unit):
         self.sense(c)
         self.movement.upd(c)
 
-        if c.get_hp(my_id) < c.get_max_hp(my_id) and c.can_heal(my_pos):
+        core: Position = self.home
+        if not c.is_in_vision(core):
+            core = core.add(self.home.direction_to(my_pos))
+
+        heal_core: bool = False
+        if c.is_in_vision(core):
+            building_id = c.get_tile_building_id(core)
+            if c.get_hp(building_id) < c.get_max_hp(building_id):
+                pass_ = (self.tile_manager.pass_ | self.tile_manager.buildable) & ~self.tile_manager.ally & ~self.tile_manager.enemy
+                if core == self.home:
+                    d = self.bfs.bfs_adj(core.x - my_pos.x, core.y - my_pos.y, pass_)
+                else:
+                    d = self.bfs.bfs_to_pos(core.x - my_pos.x, core.y - my_pos.y, pass_)
+                if d is not None:
+                    heal_core = True
+                    if d != Direction.CENTRE and self.movement.can_move(d):
+                        self.movement.move(d)
+
+        if (c.get_hp(my_id) < c.get_max_hp(my_id) or heal_core) and c.can_heal(my_pos):
             c.heal(my_pos)
+
+        if heal_core:
+            return
 
         if self.target_type == 0:
             self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
@@ -249,10 +311,27 @@ class BuilderBot(Unit):
                             c.destroy(target)
                         if c.can_build_sentinel(target, Direction.NORTH):
                             d = target.direction_to(self.target)
-                            if self.target.add(d.rotate_left()).distance_squared(self.home) > self.target.add(d.rotate_right()).distance_squared(self.home):
-                                d = d.rotate_left()
-                            else:
-                                d = d.rotate_right()
+                            nxt = target.add(d.rotate_left())
+                            d = d.rotate_right()
+                            if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                                building_id = c.get_tile_building_id(nxt)
+                                if c.get_team(building_id) != my_team:
+                                    d = d.rotate_left().rotate_left()
                             c.build_sentinel(target, d)
                             self.target_type = 0
                             break
+        elif self.target_type == 5:
+            if self.conveyor_manager is None:
+                if my_pos.distance_squared(self.target) <= 2:
+                    self.conveyor_manager = ConveyorManager(c, self.tile_manager, self.target, self.home)
+                    self.conveyor_manager.index -= 1
+                else:
+                    self.nav.move(c, self.target, self.movement)
+                c.draw_indicator_line(my_pos, self.target, 128, 0, 255)
+
+            if self.conveyor_manager is not None:
+                self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs, True)
+
+                if self.conveyor_manager.done:
+                    print("yay")
+                    self.target_type = 0

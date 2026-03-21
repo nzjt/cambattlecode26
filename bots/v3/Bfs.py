@@ -98,6 +98,30 @@ class Bfs:
                 if target & ADJ:
                     return Bfs.get_move(target & ADJ)
 
+
+    @staticmethod
+    def bfs_adj(dx: int, dy: int, pass_: int) -> Direction | None:
+        if -4 <= dx <= 4 and -4 <= dy <= 4:
+            target = 1 << (dx + dy * 10 + 44)
+            target |= target << 1 | target >> 1
+            target |= target << 10 | target >> 10
+            target &= pass_
+
+            if target >> 44 & 1:
+                return Direction.CENTRE
+
+            ADJ = Bfs.ADJ
+            if target & ADJ:
+                return Bfs.get_move(target & ADJ)
+
+            for _ in range(15):
+                target |= target << 1 | target >> 1
+                target |= target << 10 | target >> 10
+                target &= pass_
+
+                if target & ADJ:
+                    return Bfs.get_move(target & ADJ)
+
     @staticmethod
     def bfs_adj_exc_multi(targets: list[tuple[int, int]], pass_: int) -> Direction | None:
         target: int = 0

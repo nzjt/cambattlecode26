@@ -111,7 +111,7 @@ class ConveyorManager:
                             continue
             break
 
-    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs):
+    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs, repair: bool = False):
         my_id = c.get_id()
         my_team = c.get_team()
         my_pos = c.get_position(my_id)
@@ -120,7 +120,7 @@ class ConveyorManager:
             # Wow we're done
             pos: Position = self.path[0]
 
-            if c.is_in_vision(pos):
+            if not repair and c.is_in_vision(pos):
                 building_id = c.get_tile_building_id(pos)
                 if building_id is None or c.get_entity_type(building_id) != EntityType.HARVESTER:
                     if c.get_global_resources()[0] < c.get_harvester_cost()[0]:
@@ -149,9 +149,10 @@ class ConveyorManager:
             return
 
         do_build: bool = False
-        if c.is_in_vision(self.path[0]):
-            building_id = c.get_tile_building_id(self.path[0])
-            do_build = building_id is None or c.get_entity_type(building_id) != EntityType.HARVESTER
+        if not repair:
+            if c.is_in_vision(self.path[0]):
+                building_id = c.get_tile_building_id(self.path[0])
+                do_build = building_id is None or c.get_entity_type(building_id) != EntityType.HARVESTER
         wealthy = c.get_global_resources()[0] >= c.get_harvester_cost()[0]
 
         pos: Position = self.path[self.index]
@@ -185,11 +186,12 @@ class ConveyorManager:
             d: Direction = pos.direction_to(nxt)
             building_id = c.get_tile_building_id(pos)
             if need_gunner:
-                if c.get_entity_type(building_id) != EntityType.GUNNER and c.can_destroy(pos):
-                    c.destroy(pos)
+                if c.get_global_resources()[0] >= c.get_gunner_cost()[0]:
+                    if c.get_entity_type(building_id) != EntityType.GUNNER and c.can_destroy(pos):
+                        c.destroy(pos)
 
-                if c.can_build_gunner(pos, d):
-                    c.build_gunner(pos, d)
+                    if c.can_build_gunner(pos, d):
+                        c.build_gunner(pos, d)
             else:
                 keep_gunner: bool = False
                 if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
@@ -211,6 +213,7 @@ class ConveyorManager:
                                 break
 
                 if not keep_gunner and not c.get_action_cooldown():
+                    print("uh")
                     if c.can_destroy(pos):
                         c.destroy(pos)
 
