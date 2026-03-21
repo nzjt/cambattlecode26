@@ -51,7 +51,8 @@ class Bfs:
             if target & ADJ:
                 return Bfs.get_move(target & ADJ)
 
-    def bfs_to_pos(self, dx: int, dy: int, pass_: int):
+    @staticmethod
+    def bfs_to_pos(dx: int, dy: int, pass_: int):
         if -4 <= dx <= 4 and -4 <= dy <= 4:
             target = 1 << (dx + dy * 10 + 44)
 
@@ -70,7 +71,8 @@ class Bfs:
                 if target & ADJ:
                     return Bfs.get_move(target & ADJ)
 
-    def bfs_adj_exc(self, dx: int, dy: int, pass_: int) -> Direction | None:
+    @staticmethod
+    def bfs_adj_exc(dx: int, dy: int, pass_: int) -> Direction | None:
         if -4 <= dx <= 4 and -4 <= dy <= 4:
             centre = 1 << (dx + dy * 10 + 44)
             target = centre
@@ -92,6 +94,56 @@ class Bfs:
 
                 if target & ADJ:
                     return Bfs.get_move(target & ADJ)
+
+    @staticmethod
+    def closest_start(start: int, end: int, pass_: int) -> list[tuple[int, int]]:
+        if start & end:
+            i = (start & end).bit_length() - 1
+            return [(i % 10 - 4, i // 10 - 4)]
+
+        dp: list[int] = [0] * 16
+        dp[0] = end
+
+        for i in range(1, len(dp)):
+            prev = dp[i - 2]
+            prev |= prev << 1 | prev >> 1
+            prev |= prev << 10 | prev >> 10
+            end |= end << 1 | end >> 1 | end << 10 | end >> 10 | prev
+            end &= pass_
+            dp[i] = end
+
+            intersection = start & end
+            if intersection:
+                j = intersection.bit_length() - 1
+                path: list[tuple[int, int]] = []
+                while True:
+                    path.append((j % 10 - 4, j // 10 - 4))
+                    if not i:
+                        break
+                    end = dp[i - 1]
+                    if j >= 1 and end >> (j - 1) & 1:
+                        j -= 1
+                    elif end >> (j + 1) & 1:
+                        j += 1
+                    elif j >= 10 and end >> (j - 10) & 1:
+                        j -= 10
+                    elif end >> (j + 10) & 1:
+                        j += 10
+                    else:
+                        end = dp[i - 2]
+                        if j >= 11 and end >> (j - 11) & 1:
+                            j -= 11
+                        elif j >= 9 and end >> (j - 9) & 1:
+                            j -= 9
+                        elif end >> (j + 9) & 1:
+                            j += 9
+                        elif end >> (j + 11) & 1:
+                            j += 11
+                        i -= 1
+                    i -= 1
+                return path
+
+        return []
 
     @staticmethod
     def get_move(adj: int) -> Direction:

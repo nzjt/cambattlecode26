@@ -318,7 +318,6 @@ class AStarJPS:
         for i in range(max(abs(xi - x), abs(yi - y)), 500):
             for xi, yi, d in queue[i]:
                 if xi == x and yi == y:
-                    print(i)
                     break
                 f[d](xi, yi)
             else:

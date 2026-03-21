@@ -42,7 +42,7 @@ class BuilderBot(Unit):
 
                 if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) == my_team:
                     xi, yi = pos
-                    if not self.conveyor_manager.on_path[yi][xi]:
+                    if not self.conveyor_manager.path_index[yi][xi]:
                         dist = self.conveyor_manager.path[-1].distance_squared(pos)
                         if dist < self.target_dist:
                             if self.bfs.can_conveyor_reach(xi - my_pos.x, yi - my_pos.y):
@@ -59,7 +59,7 @@ class BuilderBot(Unit):
                                         break
                                     cur = cur.add(c.get_direction(building_id))
                                     if c.is_in_vision(cur):
-                                        if self.conveyor_manager.on_path[cur.y][cur.x]:
+                                        if self.conveyor_manager.path_index[cur.y][cur.x]:
                                             good = False
                                             break
                                     else:

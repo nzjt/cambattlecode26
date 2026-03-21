@@ -13,7 +13,7 @@ class AStarJPSOptimised:
         self.par: list[list[tuple[int, int] | None]] = [[None] * len(self.g[0]) for _ in range(len(self.g))]
         self.path: list[Position] = []
 
-    def compute(self, start: Position, end: Position, is_core: bool = False):
+    def compute(self, start: Position, end: list[Position], is_core: bool = False):
         g = self.g
         par = self.par
 
@@ -230,8 +230,8 @@ class AStarJPSOptimised:
                 if scan_W_bool(xj, yj) or scan_N_bool(xj, yj):
                     return xj, yj
 
-        xi, yi = end
         if is_core:
+            xi, yi = end[0]
             add_source(xi, yi - 1, 0)
             add_source(xi + 1, yi - 1, 1)
             add_source(xi + 1, yi, 2)
@@ -241,31 +241,32 @@ class AStarJPSOptimised:
             add_source(xi - 1, yi, 6)
             add_source(xi - 1, yi - 1, 7)
         else:
-            g[yi][xi] = 0
-            jp = scan_N(xi, yi)
-            if jp:
-                add(*jp, yi - jp[1], 0)
-            jp = scan_NE(xi, yi)
-            if jp:
-                add(*jp, jp[0] - xi, 1)
-            jp = scan_E(xi, yi)
-            if jp:
-                add(*jp, jp[0] - xi, 2)
-            jp = scan_SE(xi, yi)
-            if jp:
-                add(*jp, jp[0] - xi, 3)
-            jp = scan_S(xi, yi)
-            if jp:
-                add(*jp, jp[1] - yi, 4)
-            jp = scan_SW(xi, yi)
-            if jp:
-                add(*jp, xi - jp[0], 5)
-            jp = scan_W(xi, yi)
-            if jp:
-                add(*jp, xi - jp[0], 6)
-            jp = scan_NW(xi, yi)
-            if jp:
-                add(*jp, xi - jp[0], 7)
+            for xi, yi in end:
+                g[yi][xi] = 0
+                jp = scan_N(xi, yi)
+                if jp:
+                    add(*jp, yi - jp[1], 0)
+                jp = scan_NE(xi, yi)
+                if jp:
+                    add(*jp, jp[0] - xi, 1)
+                jp = scan_E(xi, yi)
+                if jp:
+                    add(*jp, jp[0] - xi, 2)
+                jp = scan_SE(xi, yi)
+                if jp:
+                    add(*jp, jp[0] - xi, 3)
+                jp = scan_S(xi, yi)
+                if jp:
+                    add(*jp, jp[1] - yi, 4)
+                jp = scan_SW(xi, yi)
+                if jp:
+                    add(*jp, xi - jp[0], 5)
+                jp = scan_W(xi, yi)
+                if jp:
+                    add(*jp, xi - jp[0], 6)
+                jp = scan_NW(xi, yi)
+                if jp:
+                    add(*jp, xi - jp[0], 7)
 
         def expand_N(xi, yi):
             gi = g[yi][xi]
@@ -438,7 +439,7 @@ class AStarJPSOptimised:
         path: list[Position] = self.path
         while True:
             xi, yi = path[-1]
-            nxt = par[yi][xi]
-            if nxt is None:
+            if g[yi][xi]:
+                path.append(Position(*par[yi][xi]))
+            else:
                 break
-            path.append(Position(*nxt))

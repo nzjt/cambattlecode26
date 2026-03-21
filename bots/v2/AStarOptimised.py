@@ -303,7 +303,6 @@ class AStarOptimised:
     def find_path(self, pos: Position):
         self.path = [pos]
         path = self.path
-        print(path)
         g = self.g
         DIRECTIONS = AStarOptimised.DIRECTIONS
 

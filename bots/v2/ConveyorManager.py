@@ -9,15 +9,27 @@ from consts import *
 class ConveyorManager:
     def __init__(self, c: Controller, tile_manager: TileManager, start: Position, target: Position):
         W: int = c.get_map_width()
-        self.on_path = [[False] * (W + 1) for _ in range(c.get_map_height() + 1)]
 
         a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager)
-        a_star.compute(start, target, True)
+        a_star.compute(start, [target], True)
 
-        self.path: list[Position] = [start]
-        path: list[Position] = self.path
-        env_grid = tile_manager.env_grid
-        for way_point in a_star.path:
+        path = self.path = ConveyorManager.normalise(a_star.path, tile_manager.env_grid)
+
+        self.path_index: list[list[int]] = [[1000000] * (W + 1) for _ in range(c.get_map_height() + 1)]
+        path_index = self.path_index
+        for i in range(len(path)):
+            x, y = path[i]
+            path_index[y][x] = i
+
+        self.index = 1
+        self.done: bool = False
+        for i in range(1, len(path)):
+            c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+
+    @staticmethod
+    def normalise(waypoints: list[Position], env_grid: list[list[int]]):
+        path: list[Position] = [waypoints[0]]
+        for way_point in waypoints:
             d: Direction = path[-1].direction_to(way_point)
             while path[-1] != way_point:
                 dx, dy = d.delta()
@@ -30,24 +42,56 @@ class ConveyorManager:
                     path.append(Position(x + dx, y + dy))
                 else:
                     path.append(path[-1].add(d))
-
-        self.index = 1
-        self.done: bool = False
-        for i in range(1, len(path)):
-            c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+        return path
 
     def place(self, c: Controller, pos: Position) -> bool:
         if self.path[-1].distance_squared(pos) != 1:
             return False
 
         c.build_conveyor(pos, pos.direction_to(self.path[-1]))
-        self.on_path[pos.y][pos.x] = True
+        self.path_index[pos.y][pos.x] = True
         return True
 
-    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs):
-        my_id = c.get_id()
+    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager):
+        x, y = c.get_position()
+        lo, hi = self.index, self.index
+        xi, yi = self.path[hi]
+        dx, dy = xi - x, yi - y
+        goal: int = 1 << (dx + dy * 10 + 44)
+
+        while lo > 1:
+            xi, yi = self.path[lo - 1]
+            dx, dy = xi - x, yi - y
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                goal |= 1 << (dx + dy * 10 + 44)
+                lo -= 1
+            else:
+                break
+
+        retarget_set: int = 0
+        for xi, yi in retargets:
+            dx, dy = xi - x, yi - y
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                retarget_set |= 1 << (dx + dy * 10 + 44)
+
+        raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, tile_manager.pass_ | tile_manager.buildable)
+        if not raw_path:
+            return
+
+        suffix: list[Position] = [Position(x + dx, y + dy) for dx, dy in raw_path]
+        suffix = ConveyorManager.normalise(suffix, tile_manager.env_grid)
+        if len(suffix) < len(self.path) - self.index:
+            while self.path[self.index] != suffix[0]:
+                self.index -= 1
+            self.path = self.path[:self.index]
+
+            self.path += suffix
+
+            for i in range(1, len(self.path)):
+                c.draw_indicator_line(self.path[i - 1], self.path[i], 255, 255, 0)
+
+    def update_index(self, c: Controller):
         my_team = c.get_team()
-        my_pos = c.get_position(my_id)
 
         while self.index < len(self.path) - 1:
             pos: Position = self.path[self.index]
@@ -66,6 +110,13 @@ class ConveyorManager:
                             self.index += 1
                             continue
             break
+
+    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs):
+        my_id = c.get_id()
+        my_team = c.get_team()
+        my_pos = c.get_position(my_id)
+        if self.index < 0:
+            return
 
         if self.index == len(self.path) - 1:
             # Wow we're done
@@ -113,6 +164,8 @@ class ConveyorManager:
                 d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
             else:
                 d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                if d is None or not c.can_move(d):
+                    d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
             if d is None:
                 # Can't reach => done?
                 self.done = True
@@ -121,7 +174,7 @@ class ConveyorManager:
                 if c.can_move(d):
                     movement.move(d)
                 else:
-                    print("wtf!")
+                    print("wtf!", d)
                 my_pos = c.get_position(my_id)
 
         if do_build and wealthy and my_pos != self.path[0]:

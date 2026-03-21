@@ -7,7 +7,6 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
-from AStarJPSOptimised import AStarJPSOptimised
 
 
 class BuilderBot(Unit):
@@ -29,48 +28,40 @@ class BuilderBot(Unit):
         my_team = c.get_team(my_id)
 
         if self.target_type == 3:
-            pos = self.home.add(self.home.direction_to(self.conveyor_manager.path[-1]))
-            # dist = self.conveyor_manager.path[-1].distance_squared(pos)
-            # if dist < self.target_dist:
-            #     self.target = pos
-            #     self.target_dist = dist
-            #     self.conveyor_manager.update(pos)
-            #
-            # for pos in c.get_nearby_tiles():
-            #     building_id = c.get_tile_building_id(pos)
-            #     if building_id is None:
-            #         continue
-            #
-            #     if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) == my_team:
-            #         xi, yi = pos
-            #         if not self.conveyor_manager.on_path[yi][xi]:
-            #             dist = self.conveyor_manager.path[-1].distance_squared(pos)
-            #             if dist < self.target_dist:
-            #                 if self.bfs.can_conveyor_reach(xi - my_pos.x, yi - my_pos.y):
-            #                     good = True
-            #                     cur = pos
-            #                     for _ in range(10):
-            #                         building_id = c.get_tile_building_id(cur)
-            #                         if building_id is None or c.get_team(building_id) != my_team:
-            #                             good = False
-            #                             break
-            #                         e_type = c.get_entity_type(building_id)
-            #                         if e_type != EntityType.CONVEYOR:
-            #                             good = e_type == EntityType.CORE
-            #                             break
-            #                         cur = cur.add(c.get_direction(building_id))
-            #                         if c.is_in_vision(cur):
-            #                             if self.conveyor_manager.on_path[cur.y][cur.x]:
-            #                                 good = False
-            #                                 break
-            #                         else:
-            #                             # Probably fine?
-            #                             break
-            #
-            #                     if good:
-            #                         self.target = pos
-            #                         self.target_dist = dist
-            #                         self.conveyor_manager.update(pos)
+            retargets: list[Position] = []
+            for pos in c.get_nearby_tiles():
+                building_id = c.get_tile_building_id(pos)
+                if c.get_entity_type(building_id) == EntityType.CONVEYOR and c.get_team(building_id) == my_team:
+                    xi, yi = pos
+                    if self.conveyor_manager.path_index[yi][xi] >= self.conveyor_manager.index:
+                        good = True
+                        cur = pos
+                        for _ in range(10):
+                            building_id = c.get_tile_building_id(cur)
+                            if building_id is None or c.get_team(building_id) != my_team:
+                                good = False
+                                break
+                            e_type = c.get_entity_type(building_id)
+                            if e_type == EntityType.CONVEYOR:
+                                cur = cur.add(c.get_direction(building_id))
+                            elif e_type == EntityType.BRIDGE:
+                                cur = c.get_bridge_target(building_id)
+                            else:
+                                good = e_type == EntityType.CORE
+                                break
+
+                            if c.is_in_vision(cur):
+                                if self.conveyor_manager.path_index[cur.y][cur.x] < self.conveyor_manager.index:
+                                    good = False
+                                    break
+                            else:
+                                # Probably fine?
+                                break
+
+                        if good:
+                            retargets.append(pos)
+
+            self.conveyor_manager.retarget(c, retargets, self.tile_manager)
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
@@ -94,7 +85,6 @@ class BuilderBot(Unit):
     def run(self, c: Controller):
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
-        my_team = c.get_team(my_id)
 
         if self.home is None:
             self.home = c.get_position(c.get_tile_building_id(my_pos))
@@ -113,6 +103,8 @@ class BuilderBot(Unit):
         elif self.target_type == 3:
             if self.conveyor_manager.done:
                 self.target_type = 0
+            else:
+                self.conveyor_manager.update_index(c)
 
         self.tile_manager.sense(c, self.home)
         self.bfs.update(c, self.conveyor_manager)
