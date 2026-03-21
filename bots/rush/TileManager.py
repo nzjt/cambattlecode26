@@ -1,5 +1,5 @@
 from cambc import *
-from consts import CARDINAL
+from consts import *
 
 
 class TileManager:
@@ -9,9 +9,11 @@ class TileManager:
         EntityType.BRIDGE,
         EntityType.ARMOURED_CONVEYOR
     }
-    ORES = {
-        Environment.ORE_TITANIUM,
-        Environment.ORE_AXIONITE
+    ENV_MAP = {
+        Environment.WALL: 0,
+        Environment.EMPTY: 1,
+        Environment.ORE_TITANIUM: 2,
+        Environment.ORE_AXIONITE: 3
     }
 
     def __init__(self, c: Controller):
@@ -19,13 +21,15 @@ class TileManager:
         H: int = c.get_map_height()
         self.pass_grid: list[int] = [0] * (H + 4)
         self.buildable_grid: list[int] = [0] * (H + 4)
+        self.ore_grid: list[int] = [0] * (H + 4)
         self.ally: int = 0
         self.enemy: int = 0
         self.pass_: int = 0
+        self.ore: int = 0
         self.buildable: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
-        self.enemy_home: Position | None = None
+        self.env_grid = [[0] * (W + 1) for _ in range(H + 1)]
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -52,7 +56,7 @@ class TileManager:
                     (grid[y + 3] << shift & only_9) << 70 |
                     (grid[y + 4] << shift & only_9) << 80)
 
-    def sense(self, c: Controller):
+    def sense(self, c: Controller, home: Position):
         get_tile_building_id = c.get_tile_building_id
         get_tile_env = c.get_tile_env
         get_entity_type = c.get_entity_type
@@ -70,7 +74,7 @@ class TileManager:
         else:
             clear >>= 4 - x
 
-        pass_grid, buildable_grid = self.pass_grid, self.buildable_grid
+        pass_grid, buildable_grid, ore_grid, env_grid = self.pass_grid, self.buildable_grid, self.ore_grid, self.env_grid
         W, H = c.get_map_width(), c.get_map_height()
         for yi in range(max(0, y - 4), min(H, y + 5)):
             pass_grid[yi] &= clear
@@ -80,16 +84,18 @@ class TileManager:
         PASS = TileManager.PASS
         ROAD = EntityType.ROAD
         MARKER = EntityType.MARKER
-        WALL = Environment.WALL
         CORE = EntityType.CORE
-        ORES = TileManager.ORES
+        ENV_MAP = TileManager.ENV_MAP
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
             building_id = get_tile_building_id(pos)
-            env = get_tile_env(pos)
+            env: int = ENV_MAP[get_tile_env(pos)]
+            env_grid[yi][xi] = env
+            if env >= 2:
+                ore_grid[yi] |= 1 << xi
             if building_id is None:
-                if env != WALL:
+                if env:
                     buildable_grid[yi] |= 1 << xi
             else:
                 e_type = get_entity_type(building_id)
@@ -102,8 +108,6 @@ class TileManager:
                 elif e_type == CORE:
                     if get_team(building_id) == my_team:
                         pass_grid[yi] |= 1 << xi
-                    else:
-                        self.enemy_home = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_grid[yi] |= 1 << xi
 
@@ -117,7 +121,7 @@ class TileManager:
                 else:
                     enemy |= 1 << (dx + dy * 10 + 44)
 
-            if env in ORES:
+            if env >= 2:
                 if building_id is not None:
                     e_type = get_entity_type(building_id)
                     if e_type == EntityType.HARVESTER and pos.distance_squared(my_pos) <= 13:
@@ -125,21 +129,20 @@ class TileManager:
                         if self.ban_harvester[yi][xi]:
                             continue
 
-                        print("test", pos)
+                        if pos.distance_squared(home) <= 5:
+                            continue
                         has_space, has_conveyor = False, False
                         for d in CARDINAL:
                             cur: Position = pos.add(d)
                             if 0 <= cur.x <= W - 1 and 0 <= cur.y <= H - 1:
-                                if c.get_tile_env(cur) == Environment.WALL:
-                                    continue
                                 building_id = c.get_tile_building_id(cur)
                                 if building_id is None:
-                                    has_space = True
+                                    has_space |= c.get_tile_env(cur) == Environment.EMPTY
                                 else:
                                     if c.get_team(building_id) != my_team:
                                         continue
                                     e_type = c.get_entity_type(building_id)
-                                    if e_type == EntityType.CONVEYOR:
+                                    if e_type in CONVEYOR_VARIANT:
                                         has_conveyor = True
                                         break
                                     elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
@@ -147,10 +150,11 @@ class TileManager:
                         if has_conveyor or not has_space:
                             continue
 
-                        print("good")
+                        print("save", pos)
                         self.build_harvester[yi][xi] = True
 
         self.ally = ally & -0x100000000001
         self.enemy = enemy
         self.pass_ = self.get_vision(x, y, self.pass_grid)
         self.buildable = self.get_vision(x, y, self.buildable_grid)
+        self.ore = self.get_vision(x, y, self.ore_grid)
