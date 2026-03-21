@@ -75,7 +75,7 @@ class Bfs:
                     return Bfs.get_move(target & ADJ)
 
     @staticmethod
-    def bfs_adj_exc(dx: int, dy: int, pass_: int) -> Direction | None:
+    def bfs_adj_exc(dx: int, dy: int, pass_: int, active: bool = False) -> Direction | None:
         if -4 <= dx <= 4 and -4 <= dy <= 4:
             centre = 1 << (dx + dy * 10 + 44)
             target = centre
@@ -83,21 +83,36 @@ class Bfs:
             target |= target << 10 | target >> 10
             target &= pass_ & ~centre
 
-            if target >> 44 & 1:
-                return Direction.CENTRE
-
-            ADJ = Bfs.ADJ
-            if target & ADJ:
-                return Bfs.get_move(target & ADJ)
-
-            for _ in range(15):
-                target |= target << 1 | target >> 1
-                target |= target << 10 | target >> 10
-                target &= pass_
-
+            if active:
+                ADJ = Bfs.ADJ & ~(1 << 44)
                 if target & ADJ:
                     return Bfs.get_move(target & ADJ)
 
+                for _ in range(15):
+                    target |= target << 1 | target >> 1
+                    target |= target << 10 | target >> 10
+                    target &= pass_
+
+                    if target & ADJ:
+                        return Bfs.get_move(target & ADJ)
+
+                if target >> 44 & 1:
+                    return Direction.CENTRE
+            else:
+                if target >> 44 & 1:
+                    return Direction.CENTRE
+
+                ADJ = Bfs.ADJ
+                if target & ADJ:
+                    return Bfs.get_move(target & ADJ)
+
+                for _ in range(15):
+                    target |= target << 1 | target >> 1
+                    target |= target << 10 | target >> 10
+                    target &= pass_
+
+                    if target & ADJ:
+                        return Bfs.get_move(target & ADJ)
 
     @staticmethod
     def bfs_adj(dx: int, dy: int, pass_: int) -> Direction | None:

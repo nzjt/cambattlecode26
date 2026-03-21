@@ -161,7 +161,7 @@ class ConveyorManager:
         if not c.get_move_cooldown() and (not do_build or wealthy):
             pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
             if need_gunner:
-                d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_, True)
             else:
                 d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
                 if d is None or d != Direction.CENTRE and not c.can_move(d):
@@ -197,23 +197,16 @@ class ConveyorManager:
                 if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
                     di: Direction = c.get_direction(building_id)
                     cur: Position = pos
-                    if di in CARDINAL:
-                        for _ in range(3):
-                            cur = cur.add(di)
-                            building_id = c.get_tile_building_id(cur)
-                            if building_id is not None:
-                                keep_gunner = c.get_team(building_id) != my_team
-                                break
-                    else:
-                        for _ in range(2):
-                            cur = cur.add(di)
-                            building_id = c.get_tile_building_id(cur)
-                            if building_id is not None:
-                                keep_gunner = c.get_team(building_id) != my_team
-                                break
+                    for _ in range(3 if di in CARDINAL else 2):
+                        cur = cur.add(di)
+                        if c.get_tile_env(cur) == Environment.WALL:
+                            break
+                        building_id = c.get_tile_building_id(cur)
+                        if building_id is not None:
+                            keep_gunner = c.get_team(building_id) != my_team
+                            break
 
                 if not keep_gunner and not c.get_action_cooldown():
-                    print("uh")
                     if c.can_destroy(pos):
                         c.destroy(pos)
 

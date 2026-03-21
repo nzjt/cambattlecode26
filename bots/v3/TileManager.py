@@ -30,6 +30,7 @@ class TileManager:
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
         self.env_grid = [[0] * (W + 1) for _ in range(H + 1)]
+        self.see_gun: bool = False
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -66,6 +67,11 @@ class TileManager:
         my_id = c.get_id()
         my_pos: Position = c.get_position(my_id)
         my_team = get_team(my_id)
+
+        self.see_gun = False
+        for building_id in c.get_nearby_buildings(9):
+            if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
+                self.see_gun = True
 
         x, y = my_pos
         clear = -0x200
