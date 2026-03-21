@@ -74,7 +74,7 @@ class ConveyorManager:
             if -4 <= dx <= 4 and -4 <= dy <= 4:
                 retarget_set |= 1 << (dx + dy * 10 + 44)
 
-        raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, tile_manager.pass_ | tile_manager.buildable)
+        raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, (tile_manager.pass_ | tile_manager.buildable) & ~tile_manager.ore)
         if not raw_path:
             return
 

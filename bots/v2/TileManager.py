@@ -25,9 +25,11 @@ class TileManager:
         H: int = c.get_map_height()
         self.pass_grid: list[int] = [0] * (H + 4)
         self.buildable_grid: list[int] = [0] * (H + 4)
+        self.ore_grid: list[int] = [0] * (H + 4)
         self.ally: int = 0
         self.enemy: int = 0
         self.pass_: int = 0
+        self.ore: int = 0
         self.buildable: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
@@ -76,7 +78,7 @@ class TileManager:
         else:
             clear >>= 4 - x
 
-        pass_grid, buildable_grid, env_grid = self.pass_grid, self.buildable_grid, self.env_grid
+        pass_grid, buildable_grid, ore_grid, env_grid = self.pass_grid, self.buildable_grid, self.ore_grid, self.env_grid
         W, H = c.get_map_width(), c.get_map_height()
         for yi in range(max(0, y - 4), min(H, y + 5)):
             pass_grid[yi] &= clear
@@ -86,7 +88,6 @@ class TileManager:
         PASS = TileManager.PASS
         ROAD = EntityType.ROAD
         MARKER = EntityType.MARKER
-        WALL = Environment.WALL
         CORE = EntityType.CORE
         ORES = TileManager.ORES
         ENV_MAP = TileManager.ENV_MAP
@@ -94,10 +95,12 @@ class TileManager:
             xi, yi = pos
             
             building_id = get_tile_building_id(pos)
-            env = get_tile_env(pos)
-            env_grid[yi][xi] = ENV_MAP[env]
+            env: int = ENV_MAP[get_tile_env(pos)]
+            env_grid[yi][xi] = env
+            if env >= 2:
+                ore_grid[yi] |= 1 << xi
             if building_id is None:
-                if env != WALL:
+                if env:
                     buildable_grid[yi] |= 1 << xi
             else:
                 e_type = get_entity_type(building_id)
@@ -160,3 +163,4 @@ class TileManager:
         self.enemy = enemy
         self.pass_ = self.get_vision(x, y, self.pass_grid)
         self.buildable = self.get_vision(x, y, self.buildable_grid)
+        self.ore = self.get_vision(x, y, self.ore_grid)
