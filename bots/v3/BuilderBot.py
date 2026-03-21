@@ -7,11 +7,13 @@ from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
+from FoundryManager import FoundryManager
 from consts import *
 
 
 class BuilderBot(Unit):
     def __init__(self):
+        self.birth: int = 0
         self.movement: Movement | None = None
         self.tile_manager: TileManager | None = None
         self.nav: Nav = Bug0Better()
@@ -22,6 +24,7 @@ class BuilderBot(Unit):
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
         self.bfs: Bfs | None = None
+        self.foundry_manager: FoundryManager | None = None
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -87,7 +90,9 @@ class BuilderBot(Unit):
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
 
-        if self.target_type == 5:
+        if self.target_type == 6:
+            pass
+        elif self.target_type == 5:
             pass
         elif self.target_type == 4:
             pass
@@ -185,10 +190,16 @@ class BuilderBot(Unit):
         my_team = c.get_team()
 
         if self.home is None:
+            self.birth = c.get_current_round()
             self.home = c.get_position(c.get_tile_building_id(my_pos))
             self.movement = Movement()
             self.tile_manager = TileManager(c)
             self.bfs = Bfs(self.tile_manager)
+
+            if self.birth >= 100:
+                if not FoundryManager.check_foundry(c):
+                    self.foundry_manager = FoundryManager(self.home, self.birth + 15)
+                    self.target_type = 6
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
@@ -333,5 +344,9 @@ class BuilderBot(Unit):
                 self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs, True)
 
                 if self.conveyor_manager.done:
-                    print("yay")
                     self.target_type = 0
+        elif self.target_type == 6:
+            self.foundry_manager.update(c, self.movement, self.tile_manager, self.bfs)
+
+            if self.foundry_manager.check_foundry(c) or c.get_current_round() >= self.foundry_manager.expiry and self.foundry_manager.target is None:
+                self.target_type = 0

@@ -9,7 +9,7 @@ class Movement:
 
     def upd(self, c: Controller):
         self.c = c
-        delta = c.get_global_resources()[0] - c.get_harvester_cost()[0]
+        delta = c.get_global_resources()[0] - c.get_foundry_cost()[0]
         if delta >= c.get_road_cost()[0]:
             self.can_move = self.can_move_rich
             self.move = self.move_rich
