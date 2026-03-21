@@ -115,8 +115,6 @@ class ConveyorManager:
         my_id = c.get_id()
         my_team = c.get_team()
         my_pos = c.get_position(my_id)
-        if self.index < 0:
-            return
 
         if self.index == len(self.path) - 1:
             # Wow we're done
@@ -130,14 +128,15 @@ class ConveyorManager:
                         return
 
                     if not 1 <= my_pos.distance_squared(pos) <= 2:
-                        for d in CARDINAL:
-                            if c.can_move(d):
-                                if my_pos.add(d).distance_squared(pos) <= 2:
-                                    movement.move(d)
-                                    break
-                        else:
+                        d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, tile_manager.pass_)
+                        if d is None:
                             # :(
-                            return
+                            pass
+                        elif c.can_move(d):
+                            movement.move(d)
+
+                    if c.can_destroy(pos):
+                        c.destroy(pos)
 
                     if c.can_build_harvester(pos):
                         c.build_harvester(pos)
@@ -164,7 +163,7 @@ class ConveyorManager:
                 d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
             else:
                 d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-                if d is None or not c.can_move(d):
+                if d is None or d != Direction.CENTRE and not c.can_move(d):
                     d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
             if d is None:
                 # Can't reach => done?
@@ -211,7 +210,7 @@ class ConveyorManager:
                                 keep_gunner = c.get_team() != my_team
                                 break
 
-                if not keep_gunner:
+                if not keep_gunner and not c.get_action_cooldown():
                     if c.can_destroy(pos):
                         c.destroy(pos)
 
