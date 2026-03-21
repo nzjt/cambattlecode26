@@ -145,6 +145,11 @@ class BuilderBot(Unit):
             self.expiry = c.get_current_round() + 260
 
         if self.target_type == 1:
+            building_id = c.get_tile_building_id(my_pos)
+            if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) != c.get_team() and c.get_current_round() >= 200:
+                c.self_destruct()
+                return
+
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 2:

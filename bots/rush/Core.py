@@ -12,3 +12,9 @@ class Core(Unit):
                 if c.can_spawn(pos):
                     c.spawn_builder(pos)
                     break
+        elif c.get_current_round() >= 100 and c.get_global_resources()[0] >= c.get_scale_percent() * 1.3:
+            for d in Direction:
+                pos = my_pos.add(d)
+                if c.can_spawn(pos):
+                    c.spawn_builder(pos)
+                    break
