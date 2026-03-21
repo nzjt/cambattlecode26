@@ -44,7 +44,7 @@ class BuilderBot(Unit):
                         if 0 <= nxt.x < W and 0 <= nxt.y < H:
                             building_id = c.get_tile_building_id(nxt)
                             if building_id is None:
-                                has_space = True
+                                has_space = c.get_tile_env(nxt) != Environment.WALL
                             elif c.get_team(building_id) == my_team:
                                 e_type = c.get_entity_type(building_id)
                                 if e_type == EntityType.SENTINEL:
@@ -110,7 +110,7 @@ class BuilderBot(Unit):
                                 if 0 <= nxt.x < W and 0 <= nxt.y < H:
                                     building_id = c.get_tile_building_id(nxt)
                                     if building_id is None:
-                                        has_space = True
+                                        has_space = c.get_tile_env(nxt) != Environment.WALL
                                     elif c.get_team(building_id) == my_team:
                                         e_type = c.get_entity_type(building_id)
                                         if e_type == EntityType.SENTINEL:
@@ -207,7 +207,14 @@ class BuilderBot(Unit):
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 2:
             c.draw_indicator_line(my_pos, self.target, 0, 255, 0)
-            self.nav.move(c, self.target, self.movement)
+            if not c.get_move_cooldown():
+                if my_pos.distance_squared(self.target) <= 2:
+                    building_id = c.get_tile_building_id(self.target)
+                    if c.get_team(building_id) == c.get_team() and c.get_entity_type(building_id) != EntityType.HARVESTER:
+                        if c.can_destroy(self.target):
+                            c.destroy(self.target)
+
+                self.nav.move(c, self.target, self.movement)
         elif self.target_type == 3:
             self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs)
         elif self.target_type == 4:

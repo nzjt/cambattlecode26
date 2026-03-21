@@ -16,7 +16,7 @@ class Bfs:
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
 
-        pass_ = self.tile_manager.pass_ | self.tile_manager.buildable
+        pass_ = (self.tile_manager.pass_ | self.tile_manager.buildable) & ~self.tile_manager.ally & ~self.tile_manager.enemy
         reach: int = 1 << 44
         for _ in range(15):
             reach |= reach << 1 | reach >> 1
