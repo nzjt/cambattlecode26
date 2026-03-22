@@ -57,7 +57,11 @@ class ConveyorManager:
         lo, hi = self.index, self.index
         xi, yi = self.path[hi]
         dx, dy = xi - x, yi - y
-        goal: int = 1 << (dx + dy * 10 + 44)
+        if -4 <= dx <= 4 and -4 <= dy <= 4:
+            goal: int = 1 << (dx + dy * 10 + 44)
+        else:
+            # ???
+            return
 
         while lo > 1:
             xi, yi = self.path[lo - 1]

@@ -198,7 +198,7 @@ class BuilderBot(Unit):
 
             if self.birth >= 100:
                 if not FoundryManager.check_foundry(c):
-                    self.foundry_manager = FoundryManager(self.home, self.birth + 15)
+                    self.foundry_manager = FoundryManager(self.home, self.birth + 25)
                     self.target_type = 6
 
         if self.target_type == 1:
