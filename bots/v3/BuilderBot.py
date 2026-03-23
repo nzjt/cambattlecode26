@@ -49,7 +49,7 @@ class BuilderBot(Unit):
                                 if not trustworthy:
                                     for e in Direction:
                                         nxt = pos.add(e)
-                                        if c.is_in_vision(nxt):
+                                        if 0 <= nxt.x < W and 0 <= nxt.y < H:
                                             bb_id = c.get_tile_builder_bot_id(nxt)
                                             if bb_id is not None and bb_id != my_id and c.get_team(bb_id) == my_team:
                                                 return False

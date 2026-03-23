@@ -197,17 +197,21 @@ class ConveyorManager:
                     if c.can_build_gunner(pos, d):
                         c.build_gunner(pos, d)
             else:
+                W, H = c.get_map_width(), c.get_map_height()
                 keep_gunner: bool = False
                 if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
                     di: Direction = c.get_direction(building_id)
                     cur: Position = pos
                     for _ in range(3 if di in CARDINAL else 2):
                         cur = cur.add(di)
-                        if c.get_tile_env(cur) == Environment.WALL:
-                            break
-                        building_id = c.get_tile_building_id(cur)
-                        if building_id is not None:
-                            keep_gunner = c.get_team(building_id) != my_team
+                        if 0 <= cur.x < W and 0 <= cur.y < H:
+                            if c.get_tile_env(cur) == Environment.WALL:
+                                break
+                            building_id = c.get_tile_building_id(cur)
+                            if building_id is not None:
+                                keep_gunner = c.get_team(building_id) != my_team
+                                break
+                        else:
                             break
 
                 if not keep_gunner and not c.get_action_cooldown():
