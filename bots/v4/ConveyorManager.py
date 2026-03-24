@@ -137,7 +137,7 @@ class ConveyorManager:
                             # :(
                             pass
                         elif c.can_move(d):
-                            movement.move(d)
+                            movement.move_(d)
 
                     if c.can_destroy(pos):
                         c.destroy(pos)
@@ -176,7 +176,7 @@ class ConveyorManager:
                 return
             elif d != Direction.CENTRE:
                 if c.can_move(d):
-                    movement.move(d)
+                    movement.move_(d)
                 else:
                     print("wtf!", d)
                 my_pos = c.get_position(my_id)

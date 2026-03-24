@@ -262,7 +262,7 @@ class BuilderBot(Unit):
                 if d is not None:
                     heal_core = True
                     if d != Direction.CENTRE and self.movement.can_move(d):
-                        self.movement.move(d)
+                        self.movement.move_(d)
 
         if (c.get_hp(my_id) < c.get_max_hp(my_id) or heal_core) and c.can_heal(my_pos):
             c.heal(my_pos)
@@ -277,7 +277,7 @@ class BuilderBot(Unit):
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
-            self.nav.move(c, self.target, self.movement)
+            self.nav.move_(c, self.target, self.movement)
         elif self.target_type == 2:
             c.draw_indicator_line(my_pos, self.target, 0, 255, 0)
             if not c.get_move_cooldown():
@@ -287,7 +287,7 @@ class BuilderBot(Unit):
                         if c.can_destroy(self.target):
                             c.destroy(self.target)
 
-                self.nav.move(c, self.target, self.movement)
+                self.nav.move_(c, self.target, self.movement)
         elif self.target_type == 3:
             self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs)
         elif self.target_type == 4:
@@ -311,7 +311,7 @@ class BuilderBot(Unit):
                 # :(
                 pass
             elif d != Direction.CENTRE and self.movement.can_move(d):
-                self.movement.move(d)
+                self.movement.move_(d)
                 my_pos = c.get_position()
             c.draw_indicator_line(my_pos, self.target, 255, 128, 0)
 
@@ -337,7 +337,7 @@ class BuilderBot(Unit):
                     self.conveyor_manager = ConveyorManager(c, self.tile_manager, self.target, self.home)
                     self.conveyor_manager.index -= 1
                 else:
-                    self.nav.move(c, self.target, self.movement)
+                    self.nav.move_(c, self.target, self.movement)
                 c.draw_indicator_line(my_pos, self.target, 128, 0, 255)
 
             if self.conveyor_manager is not None:

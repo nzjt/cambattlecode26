@@ -3,5 +3,5 @@ from Movement import Movement
 
 
 class Nav:
-    def move(self, c: Controller, target: Position, movement: Movement) -> None:
+    def move_(self, c: Controller, target: Position, movement: Movement) -> None:
         pass

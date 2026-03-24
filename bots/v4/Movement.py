@@ -5,17 +5,17 @@ class Movement:
     def __init__(self):
         self.c: Controller | None = None
         self.can_move = None
-        self.move = None
+        self.move_ = None
 
     def upd(self, c: Controller):
         self.c = c
         delta = c.get_global_resources()[0] - c.get_foundry_cost()[0]
         if delta >= c.get_road_cost()[0]:
             self.can_move = self.can_move_rich
-            self.move = self.move_rich
+            self.move_ = self.move_rich
         else:
             self.can_move = c.can_move
-            self.move = c.move
+            self.move_ = c.move
 
     def can_move_rich(self, d: Direction) -> bool:
         c: Controller = self.c
