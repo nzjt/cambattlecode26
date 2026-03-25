@@ -60,7 +60,7 @@ class FoundryManager:
                 if my_pos.distance_squared(self.target) > 2:
                     d: Direction = bfs.bfs_adj_exc(self.target.x - my_pos.x, self.target.y - my_pos.y, tile_manager.pass_)
                     if d is not None and d != Direction.CENTRE and movement.can_move(d):
-                        movement.move_(d)
+                        movement.move(d)
                         my_pos = c.get_position()
 
                 if my_pos.distance_squared(self.target) <= 2:
@@ -83,7 +83,7 @@ class FoundryManager:
             if my_pos.distance_squared(self.sub_target) > 2:
                 d: Direction = bfs.bfs_adj_exc(self.sub_target.x - my_pos.x, self.sub_target.y - my_pos.y, tile_manager.pass_)
                 if d is not None and d != Direction.CENTRE and movement.can_move(d):
-                    movement.move_(d)
+                    movement.move(d)
                     my_pos = c.get_position()
 
             if my_pos.distance_squared(self.sub_target) <= 2:

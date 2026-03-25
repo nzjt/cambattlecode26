@@ -9,7 +9,7 @@ class Bug0(Nav):
         self.target: Position | None = None
         self.turn: bool | None = None
 
-    def move_(self, c: Controller, target: Position, movement: Movement) -> None:
+    def move(self, c: Controller, target: Position, movement: Movement) -> None:
         if c.get_move_cooldown():
             return
 
@@ -24,7 +24,7 @@ class Bug0(Nav):
             return
 
         if movement.can_move(d):
-            movement.move_(d)
+            movement.move(d)
             self.turn = None
         else:
             if self.turn is None:
@@ -35,12 +35,12 @@ class Bug0(Nav):
                 for _ in range(7):
                     d = d.rotate_left()
                     if movement.can_move(d):
-                        movement.move_(d)
+                        movement.move(d)
                         return
             else:
                 # Right turning
                 for _ in range(7):
                     d = d.rotate_right()
                     if movement.can_move(d):
-                        movement.move_(d)
+                        movement.move(d)
                         return

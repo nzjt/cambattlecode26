@@ -11,7 +11,7 @@ class Bug0Better(Nav):
         self.dist: int = 0
         self.prev: Direction | None = None
 
-    def move_(self, c: Controller, target: Position, movement: Movement) -> None:
+    def move(self, c: Controller, target: Position, movement: Movement) -> None:
         if c.get_move_cooldown():
             return
 
@@ -43,10 +43,10 @@ class Bug0Better(Nav):
 
         if movement.can_move(opt):
             if self.prev is None:
-                movement.move_(opt)
+                movement.move(opt)
                 return
             elif dist < self.dist:
-                movement.move_(opt)
+                movement.move(opt)
                 self.turn = None
                 return
         elif self.prev is None:
@@ -57,7 +57,7 @@ class Bug0Better(Nav):
             # Left turning
             for _ in range(8):
                 if movement.can_move(d):
-                    movement.move_(d)
+                    movement.move(d)
                     self.prev = d
                     return
                 d = d.rotate_left()
@@ -65,7 +65,7 @@ class Bug0Better(Nav):
             # Right turning
             for _ in range(8):
                 if movement.can_move(d):
-                    movement.move_(d)
+                    movement.move(d)
                     self.prev = d
                     return
                 d = d.rotate_right()
