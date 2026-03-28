@@ -1,0 +1,338 @@
+from cambc import *
+from AStarJPSOptimised import AStarJPSOptimised
+from TileManager import TileManager
+from Movement import Movement
+from Bfs import Bfs
+from utils import normalise_on_grid
+from consts import *
+
+
+class ConveyorManagerBarrier:
+    BUILD_BARRIER = {
+        Environment.EMPTY,
+        Environment.ORE_AXIONITE
+    }
+
+    def __init__(self, c: Controller, tile_manager: TileManager, start: Position, target: Position):
+        W: int = c.get_map_width()
+
+        a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager)
+        x, y = start
+        g: list[list[int]] = a_star.g
+        blocked_N: bool = g[y - 1][x] == -1
+        blocked_E: bool = g[y][x + 1] == -1
+        blocked_S: bool = g[y + 1][x] == -1
+        blocked_W: bool = g[y][x - 1] == -1
+        if blocked_N and blocked_E:
+            g[y - 1][x + 1] = -1
+        if blocked_E and blocked_S:
+            g[y + 1][x + 1] = -1
+        if blocked_S and blocked_W:
+            g[y + 1][x - 1] = -1
+        if blocked_W and blocked_N:
+            g[y - 1][x - 1] = -1
+
+        a_star.compute(start, [target], True)
+
+        if a_star.path:
+            path = self.path = normalise_on_grid(a_star.path, tile_manager.env_grid)
+            self.path_index: list[list[bool]] | None = None
+            self.index_path(c)
+
+            self.index = 1
+            self.done: bool = False
+            for i in range(1, len(path)):
+                c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+        else:
+            self.path = []
+
+    def index_path(self, c: Controller):
+        path: list[Position] = self.path
+        W, H = c.get_map_width(), c.get_map_height()
+        path_index = self.path_index = [[1000000] * (W + 1) for _ in range(H + 1)]
+        for i in range(len(path)):
+            x, y = path[i]
+            path_index[y][x] = i
+
+    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager):
+        x, y = c.get_position()
+        lo, hi = self.index, self.index
+        xi, yi = self.path[hi]
+        dx, dy = xi - x, yi - y
+        if -4 <= dx <= 4 and -4 <= dy <= 4:
+            goal: int = 1 << (dx + dy * 10 + 44)
+        else:
+            # ???
+            return
+
+        while lo > 1:
+            xi, yi = self.path[lo - 1]
+            dx, dy = xi - x, yi - y
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                goal |= 1 << (dx + dy * 10 + 44)
+                lo -= 1
+            else:
+                break
+
+        retarget_set: int = 0
+        for xi, yi in retargets:
+            dx, dy = xi - x, yi - y
+            if -4 <= dx <= 4 and -4 <= dy <= 4:
+                retarget_set |= 1 << (dx + dy * 10 + 44)
+
+        raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, (tile_manager.pass_ | tile_manager.buildable | tile_manager.barrier) & ~tile_manager.ore)
+        if not raw_path:
+            return
+
+        suffix: list[Position] = [Position(x + dx, y + dy) for dx, dy in raw_path]
+        suffix = normalise_on_grid(suffix, tile_manager.env_grid)
+        if len(suffix) < len(self.path) - self.index:
+            while self.path[self.index] != suffix[0]:
+                self.index -= 1
+            self.path = self.path[:self.index]
+
+            self.path += suffix
+
+            for i in range(1, len(self.path)):
+                c.draw_indicator_line(self.path[i - 1], self.path[i], 255, 255, 0)
+
+            self.index_path(c)
+
+    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs, repair: bool = False, wait: bool = False):
+        my_id = c.get_id()
+        my_team = c.get_team()
+        my_pos = c.get_position(my_id)
+        on_ore: bool = not repair and my_pos == self.path[0]
+        W, H = c.get_map_width(), c.get_map_height()
+        enemy_near: bool = False
+        for bb_id in c.get_nearby_units(8):
+            if c.get_team(bb_id) != my_team:
+                enemy_near = True
+                break
+
+        def build_barriers() -> bool:
+            pos: Position = self.path[self.index - 1]
+            for e in (CARDINAL if on_ore else DIRECTIONS):
+                cur = pos.add(e)
+                if 0 <= cur.x < W and 0 <= cur.y < H:
+                    if self.path_index[cur.y][cur.x] == 1000000 and c.get_tile_env(cur) in ConveyorManagerBarrier.BUILD_BARRIER:
+                        building_id = c.get_tile_building_id(cur)
+                        if c.get_team(building_id) == my_team:
+                            if building_id is None or c.get_entity_type(building_id) in UNIMPORTANT:
+                                if c.get_action_cooldown() or c.get_global_resources()[0] < c.get_barrier_cost()[0]:
+                                    return False
+                                if c.get_tile_builder_bot_id(cur) is not None:
+                                    return False
+                                if cur.distance_squared(my_pos) > 2:
+                                    return False
+                                if c.can_destroy(cur):
+                                    c.destroy(cur)
+                                c.build_barrier(cur)
+                        else:
+                            if not enemy_near:
+                                if cur.distance_squared(my_pos) <= 2:
+                                    d: Direction = my_pos.direction_to(cur)
+                                    if not movement.can_move(d):
+                                        return False
+                                else:
+                                    d: Direction = bfs.bfs_to_pos(cur.x - my_pos.x, cur.y - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
+                                if d is not None:
+                                    if not c.get_move_cooldown():
+                                        movement.move(d)
+                            if c.can_fire(cur):
+                                c.fire(cur)
+                            return False
+
+            return True
+
+        do_build: bool = False
+        if on_ore:
+            if wait:
+                return
+
+            pos: Position = self.path[1]
+            do_build = True
+            build_barriers()
+            building_id = c.get_tile_building_id(pos)
+            if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
+                if movement.can_move(my_pos.direction_to(pos)) and not c.get_action_cooldown():
+                    if c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
+                        movement.move(my_pos.direction_to(pos))
+                        if c.can_destroy(self.path[0]):
+                            c.destroy(self.path[0])
+
+                        c.build_harvester(self.path[0])
+                        return
+        else:
+            if my_pos.distance_squared(self.path[0]) <= 2:
+                building_id = c.get_tile_building_id(self.path[0])
+                if c.get_entity_type(building_id) != EntityType.HARVESTER:
+                    d: Direction = my_pos.direction_to(self.path[0])
+                    if not c.get_move_cooldown() and (c.can_move(d) or c.get_global_resources()[0] >= c.get_road_cost()[0]):
+                        if c.can_destroy(self.path[0]):
+                            c.destroy(self.path[0])
+                        if c.can_build_road(self.path[0]):
+                            c.build_road(self.path[0])
+                        movement.move(d)
+                    else:
+                        return
+
+        if self.index == len(self.path) - 1:
+            if not build_barriers():
+                return
+
+            # Special case where ore is adjacent to conveyor
+            if len(self.path) == 2:
+                dist = my_pos.distance_squared(self.path[0])
+                if dist == 0:
+                    if c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
+                        if not c.get_move_cooldown() and not c.get_action_cooldown():
+                            for d in DIRECTIONS:
+                                if c.can_move(d):
+                                    movement.move(d)
+
+                                    if c.can_destroy(my_pos):
+                                        c.destroy(my_pos)
+                                    if c.can_build_harvester(my_pos):
+                                        c.build_harvester(my_pos)
+                                        self.done = True
+
+                                    return
+
+                            for d in DIRECTIONS:
+                                cur = my_pos.add(d)
+                                if c.can_build_road(cur):
+                                    c.build_road(cur)
+                    return
+                elif dist <= 2:
+                    if c.get_global_resources()[0] >= c.get_harvester_cost()[0]:
+                        if not c.get_action_cooldown():
+                            if c.can_destroy(self.path[0]):
+                                c.destroy(self.path[0])
+                            c.build_harvester(self.path[0])
+                            self.done = True
+                            return
+                    d: Direction = my_pos.direction_to(self.path[0])
+                    if movement.can_move(d):
+                        movement.move(d)
+            else:
+                self.done = not on_ore
+            return
+
+        pos: Position = self.path[self.index]
+        building_id = c.get_tile_building_id(pos)
+        if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
+            keep_gunner: bool = False
+            di: Direction = c.get_direction(building_id)
+            cur: Position = pos
+            for _ in range(3 if di in CARDINAL else 2):
+                cur = cur.add(di)
+                if 0 <= cur.x < W and 0 <= cur.y < H and c.get_tile_env(cur) != Environment.WALL:
+                    building_id = c.get_tile_building_id(cur)
+                    if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                        keep_gunner = c.get_team(building_id) != my_team
+                        break
+                else:
+                    break
+
+            if keep_gunner:
+                if my_pos != self.path[self.index - 1]:
+                    xi, yi = self.path[self.index - 1]
+                    d: Direction = bfs.bfs_to_pos(xi - my_pos.x, yi - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
+                    if d is not None and d != Direction.CENTRE:
+                        movement.move(d)
+
+                return
+            else:
+                if c.can_destroy(pos):
+                    c.destroy(pos)
+                else:
+                    xi, yi = pos
+                    d: Direction = bfs.bfs_to_pos(xi - my_pos.x, yi - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
+                    if d is not None and d != Direction.CENTRE:
+                        movement.move(d)
+
+                    if c.can_destroy(pos):
+                        c.destroy(pos)
+                    else:
+                        return
+
+        need_gunner = c.is_in_vision(pos)
+        if need_gunner:
+            building_id = c.get_tile_building_id(pos)
+            need_gunner &= c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER
+            if need_gunner:
+                self.index -= 1
+                pos = self.path[self.index]
+            else:
+                nxt = self.path[self.index + 1]
+                need_gunner = c.is_in_vision(nxt)
+                if need_gunner:
+                    building_id = c.get_tile_building_id(nxt)
+                    need_gunner &= c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER
+        nxt = self.path[self.index + 1]
+
+        if my_pos.distance_squared(pos) <= 2:
+            d: Direction = pos.direction_to(nxt)
+            if need_gunner:
+                if c.get_global_resources()[0] >= c.get_gunner_cost()[0]:
+                    pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
+                    d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                    if d is not None and d != Direction.CENTRE:
+                        movement.move(d)
+
+                    if c.can_destroy(pos):
+                        c.destroy(pos)
+
+                    if c.can_build_gunner(pos, d):
+                        c.build_gunner(pos, d)
+            else:
+                if build_barriers():
+                    if not c.get_move_cooldown() and not c.get_action_cooldown():
+                        dx, dy = d.delta()
+                        if dx and dy:
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+
+                            if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                c.build_bridge(pos, nxt)
+                                self.index += 1
+                        else:
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+
+                            if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
+                                c.build_conveyor(pos, d)
+                                self.index += 1
+
+                            if do_build:
+                                return
+
+                        pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
+                        d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                        if d is None or d != Direction.CENTRE and not c.can_move(d):
+                            d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+
+                        if d is not None and d != Direction.CENTRE:
+                            movement.move(d)
+                else:
+                    if not do_build and not c.get_move_cooldown():
+                        pos = self.path[self.index - 1]
+                        pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
+                        d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                        if d is None or d != Direction.CENTRE and not c.can_move(d):
+                            d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+
+                        if d is not None and d != Direction.CENTRE:
+                            movement.move(d)
+        else:
+            if do_build:
+                return
+
+            pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
+            d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+            if d is None or d != Direction.CENTRE and not c.can_move(d):
+                d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+
+            if d is not None and d != Direction.CENTRE:
+                movement.move(d)

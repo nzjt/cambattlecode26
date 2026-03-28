@@ -19,7 +19,7 @@ class AStar:
     def __init__(self, tile_manager: TileManager):
         self.tile_manager = tile_manager
         INF = AStar.INF
-        self.g: list[list[int]] = [[INF if e else -1 for e in row] for row in self.tile_manager.env_grid]
+        self.g: list[list[int]] = [[INF if e == 2 else -1 for e in row] for row in self.tile_manager.env_grid]
         self.path: list[Position] = []
 
     def compute(self, start: Position, end: Position):

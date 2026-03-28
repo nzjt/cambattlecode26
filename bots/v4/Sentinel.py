@@ -24,9 +24,9 @@ class Sentinel(Unit):
                     if 0 <= nxt.x < W and 0 <= nxt.y < H and c.can_fire(nxt):
                         building_id = c.get_tile_building_id(nxt)
                         if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
-                            if score < 5:
+                            if score < 7:
                                 best = nxt
-                                score = 5
+                                score = 7
                                 break
             else:
                 if c.get_team(e_id) == my_team:
@@ -45,12 +45,20 @@ class Sentinel(Unit):
                         if score < 1:
                             best = pos
                             score = 1
+                    elif e_type in TURRET:
+                        if score < 6:
+                            best = pos
+                            score = 6
                     elif e_type == EntityType.BUILDER_BOT:
                         building_id = c.get_tile_building_id(pos)
                         if building_id is None or c.get_team(building_id) != my_team or c.get_entity_type(building_id) in UNIMPORTANT:
                             if score < 3:
                                 best = pos
                                 score = 3
+                    elif e_type == EntityType.FOUNDRY:
+                        if score < 5:
+                            best = pos
+                            score = 5
                     else:
                         if score < 2:
                             best = pos

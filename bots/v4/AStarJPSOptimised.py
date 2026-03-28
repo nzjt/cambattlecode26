@@ -6,10 +6,19 @@ from consts import *
 class AStarJPSOptimised:
     INF = 1000000
 
-    def __init__(self, tile_manager: TileManager):
+    def __init__(self, tile_manager: TileManager, mode: int = 0):
         self.tile_manager = tile_manager
         INF = AStarJPSOptimised.INF
-        self.g: list[list[int]] = [[INF if e == 1 else -1 for e in row] for row in self.tile_manager.env_grid]
+        if mode == 0:
+            # Conveyor nav
+            self.g: list[list[int]] = [[INF if e == 2 else -1 for e in row] for row in self.tile_manager.env_grid]
+        else:
+            # Bot nav
+            self.g: list[list[int]] = [[INF if p else -1 for p in row] for row in self.tile_manager.pass_grid]
+
+        for row in self.g:
+            row.append(-1)
+        self.g.append([-1] * len(self.g[0]))
         self.par: list[list[tuple[int, int] | None]] = [[None] * len(self.g[0]) for _ in range(len(self.g))]
         self.path: list[Position] = []
 
@@ -434,6 +443,8 @@ class AStarJPSOptimised:
             else:
                 continue
             break
+        else:
+            return
 
         self.path = [start]
         path: list[Position] = self.path

@@ -19,7 +19,7 @@ class AStarJPS:
     def __init__(self, tile_manager: TileManager):
         self.tile_manager = tile_manager
         INF = AStarJPS.INF
-        self.g: list[list[int]] = [[INF if e else -1 for e in row] for row in self.tile_manager.env_grid]
+        self.g: list[list[int]] = [[INF if e == 2 else -1 for e in row] for row in self.tile_manager.env_grid]
         self.par: list[list[tuple[int, int] | None]] = [[None] * len(self.g[0]) for _ in range(len(self.g))]
         self.path: list[Position] = []
 
