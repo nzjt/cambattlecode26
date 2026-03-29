@@ -16,9 +16,10 @@ class TileManager:
         Environment.ORE_AXIONITE: 4
     }
 
-    def __init__(self, c: Controller):
+    def __init__(self, c: Controller, home: Position):
         W: int = c.get_map_width()
         H: int = c.get_map_height()
+        self.home: Position = home
         self.pass_bitset: list[int] = [0] * (H + 4)
         self.buildable_bitset: list[int] = [0] * (H + 4)
         self.barrier_bitset: list[int] = [0] * (H + 4)
@@ -36,6 +37,7 @@ class TileManager:
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.protected: list[list[bool]] = []
+        self.has_kill_chamber: bool = False
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -101,6 +103,7 @@ class TileManager:
         CORE = EntityType.CORE
         ENV_MAP = TileManager.ENV_MAP
         LAUNCHER = EntityType.LAUNCHER
+        GUNNER = EntityType.GUNNER
 
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
@@ -148,6 +151,12 @@ class TileManager:
                     for yj in range(yi - 1, yi + 2):
                         for xj in range(xi - 1, xi + 2):
                             protected[yj][xj] = True
+                elif e_type == GUNNER:
+                    pass_grid[yi][xi] = False
+                    if get_team(building_id) == my_team:
+                        if pos.distance_squared(self.home) <= 8:
+                            if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
+                                self.has_kill_chamber = True
                 else:
                     pass_grid[yi][xi] = False
 

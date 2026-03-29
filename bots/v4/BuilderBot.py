@@ -1,4 +1,6 @@
 import random
+from lib2to3.pgen2.literals import simple_escapes
+
 from cambc import *
 from Unit import Unit
 from Movement import Movement
@@ -20,6 +22,7 @@ class BuilderBot(Unit):
         self.nav: Nav | None = None
         self.home: Position | None = None
         self.target: Position | None = None
+        self.sub_target: Position | None = None
         self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors, 5: repair conveyor
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
@@ -183,12 +186,60 @@ class BuilderBot(Unit):
                         if self.target_type == 2:
                             if dist >= self.target_dist:
                                 continue
-
                         self.target = pos
                         self.target_type = 2
                         self.target_dist = dist
                         self.conveyor_manager = None
 
+                if c.get_current_round() >= 200 and pos.distance_squared(my_pos) <= 2 and pos.distance_squared(self.home) <= 13:
+                    building_id = c.get_tile_building_id(pos)
+                    if c.get_entity_type(building_id) in MONOCHILD_CONVEYOR:
+                        d: Direction = c.get_direction(building_id)
+                        count = 0
+                        for e in CARDINAL:
+                            cur = pos.add(e)
+                            if 0 <= cur.x < W and 0 <= cur.y < H:
+                                building_id = c.get_tile_building_id(cur)
+                                e_type = c.get_entity_type(building_id)
+                                if e_type == EntityType.SPLITTER:
+                                    count += 1
+                                elif e_type in MONOCHILD_CONVEYOR and c.get_direction(building_id) == e.opposite():
+                                    count += 1
+                        if count == 1:
+                            for d in (d.rotate_left().rotate_left(), d.rotate_right().rotate_right()):
+                                cur = pos.add(d)
+                                if cur.distance_squared(self.home) > 8:
+                                    continue
+                                if not (0 <= cur.x < W and 0 <= cur.y < H):
+                                    continue
+                                building_id = c.get_tile_building_id(cur)
+                                if building_id is not None and c.get_entity_type(building_id) not in UNIMPORTANT:
+                                    break
+                                cur = cur.add(d)
+                                if cur.distance_squared(self.home) > 8:
+                                    continue
+                                if not (0 <= cur.x < W and 0 <= cur.y < H):
+                                    continue
+                                building_id = c.get_tile_building_id(cur)
+                                if building_id is not None and c.get_entity_type(building_id) not in UNIMPORTANT:
+                                    break
+                                for e in Direction:
+                                    adj = cur.add(e)
+                                    if 0 <= adj.x < W and 0 <= adj.y < H:
+                                        building_id = c.get_tile_building_id(adj)
+                                        if building_id is not None and c.get_entity_type(building_id) not in CHAMBER_WALL:
+                                            break
+                                else:
+                                    self.target = pos
+                                    self.sub_target = pos.add(d)
+                                    self.target_type = 7
+
+                building_id = c.get_tile_building_id(pos)
+                if c.get_entity_type(building_id) in CONVEYOR_VARIANT:
+                    if c.get_team(building_id) != my_team:
+                        if c.get_hp(building_id) < c.get_max_hp(building_id):
+                            self.target = pos
+                            self.target_type = 9
                 # if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
                 #     # Need to repair!
                 #     print("rep", pos)
@@ -207,15 +258,15 @@ class BuilderBot(Unit):
             self.birth = c.get_current_round()
             self.home = c.get_position(c.get_tile_building_id(my_pos))
             self.movement = Movement()
-            self.tile_manager = TileManager(c)
+            self.tile_manager = TileManager(c, self.home)
             self.bfs = Bfs(self.home, self.tile_manager)
             self.nav = AStarNav(self.tile_manager, self.bfs)
             self.prev_resources = c.get_global_resources()[0]
 
-            if self.birth >= 100:
-                if not FoundryManager.check_foundry(c):
-                    self.foundry_manager = FoundryManager(self.home, self.birth + 25)
-                    self.target_type = 6
+            # if self.birth >= 100:
+            #     if not FoundryManager.check_foundry(c):
+            #         self.foundry_manager = FoundryManager(self.home, self.birth + 25)
+            #         self.target_type = 6
 
         self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
         delta = c.get_global_resources()[0] - self.prev_resources
@@ -227,19 +278,19 @@ class BuilderBot(Unit):
                 self.target_type = 0
         elif self.target_type == 2:
             if c.is_in_vision(self.target):
-                if self.is_troll:
-                    building_id = c.get_tile_building_id(self.target)
-                    e_type = c.get_entity_type(building_id)
-                    if c.get_team(building_id) == my_team:
-                        if e_type == EntityType.BARRIER or e_type == EntityType.HARVESTER:
-                            self.target_type = 0
-                    else:
-                        if e_type not in DESTROY_ENEMY:
-                            self.target_type = 0
+                bb_id = c.get_tile_builder_bot_id(self.target)
+                if bb_id is not None and bb_id != my_id:
+                    self.target_type = 0
                 else:
-                    bb_id = c.get_tile_builder_bot_id(self.target)
-                    if bb_id is not None and bb_id != my_id:
-                        self.target_type = 0
+                    if self.is_troll:
+                        building_id = c.get_tile_building_id(self.target)
+                        e_type = c.get_entity_type(building_id)
+                        if c.get_team(building_id) == my_team:
+                            if e_type == EntityType.BARRIER or e_type == EntityType.HARVESTER:
+                                self.target_type = 0
+                        else:
+                            if e_type not in DESTROY_ENEMY:
+                                self.target_type = 0
         elif self.target_type == 3:
             if self.conveyor_manager.done:
                 self.target_type = 0
@@ -269,6 +320,10 @@ class BuilderBot(Unit):
         self.sense(c)
         self.movement.upd(c)
 
+        if self.target_type == 1:
+            if not self.tile_manager.pass_grid[self.target.y][self.target.x]:
+                self.target_type = 0
+
         core: Position = self.home
         if not c.is_in_vision(core):
             core = core.add(self.home.direction_to(my_pos))
@@ -295,9 +350,12 @@ class BuilderBot(Unit):
             return
 
         if self.target_type == 0:
-            self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-            self.target_type = 1
-            self.expiry = c.get_current_round() + 260
+            for _ in range(10):
+                self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
+                if self.tile_manager.pass_grid[self.target.y][self.target.x]:
+                    self.target_type = 1
+                    self.expiry = c.get_current_round() + 260
+                    break
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
@@ -398,7 +456,91 @@ class BuilderBot(Unit):
 
             if self.foundry_manager.check_foundry(c) or c.get_current_round() >= self.foundry_manager.expiry and self.foundry_manager.target is None:
                 self.target_type = 0
+        elif self.target_type == 7:
+            dist = my_pos.distance_squared(self.target)
+            if dist > 8:
+                self.nav.move(c, self.target, self.movement)
+            else:
+                building_id = c.get_tile_building_id(self.target)
+                if c.get_entity_type(building_id) == EntityType.SPLITTER:
+                    building_id = c.get_tile_building_id(self.sub_target)
+                    if c.get_entity_type(building_id) == EntityType.GUNNER:
+                        target = self.sub_target.add(self.target.direction_to(self.sub_target))
+                        if my_pos != target:
+                            self.nav.move(c, target, self.movement)
+                            my_pos = c.get_position()
 
+                        if my_pos == target:
+                            for d in DIRECTIONS:
+                                cur = target.add(d)
+                                if 0 <= cur.x < W and 0 <= cur.y < H:
+                                    building_id = c.get_tile_building_id(cur)
+                                    if building_id is None or c.get_entity_type(building_id) in UNIMPORTANT:
+                                        if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_barrier_cost()[0]:
+                                            if c.can_destroy(cur):
+                                                c.destroy(cur)
+                                            c.build_barrier(cur)
+                                        else:
+                                            break
+                            else:
+                                self.target_type = 8
+                                self.sub_target = target
+                                for d in DIRECTIONS:
+                                    cur = target.add(d)
+                                    building_id = c.get_tile_building_id(cur)
+                                    if c.get_entity_type(building_id) == EntityType.CORE:
+                                        self.target = cur
+                                        break
+                    else:
+                        dist = my_pos.distance_squared(self.sub_target)
+                        if dist > 2:
+                            self.nav.move(c, self.sub_target, self.movement)
+                        else:
+                            if not dist:
+                                for d in DIRECTIONS:
+                                    if c.can_move(d):
+                                        self.movement.move(d)
+                                        my_pos = c.get_position()
+                                        dist = my_pos.distance_squared(self.sub_target)
+                                        break
+                            if dist:
+                                if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_gunner_cost()[0]:
+                                    d: Direction = self.target.direction_to(self.sub_target)
+                                    if c.can_destroy(self.sub_target):
+                                        c.destroy(self.sub_target)
+                                    c.build_gunner(self.sub_target, d)
+                else:
+                    if dist <= 2:
+                        if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_splitter_cost()[0]:
+                            d: Direction = c.get_direction(building_id)
+                            if c.can_destroy(self.target):
+                                c.destroy(self.target)
+                            c.build_splitter(self.target, d)
+                    else:
+                        self.nav.move(c, self.target, self.movement)
+        elif self.target_type == 8:
+            if my_pos != self.target:
+                self.nav.move(c, self.target, self.movement)
+            if my_pos.distance_squared(self.sub_target) <= 2:
+                building_id = c.get_tile_building_id(self.sub_target)
+                if c.get_entity_type(building_id) != EntityType.ROAD:
+                    if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_road_cost()[0]:
+                        if c.can_destroy(self.sub_target):
+                            c.destroy(self.sub_target)
+                        c.build_road(self.sub_target)
+        elif self.target_type == 9:
+            if c.is_in_vision(self.target):
+                building_id = c.get_tile_building_id(self.target)
+                if c.get_hp(building_id) == c.get_max_hp(building_id):
+                    self.target_type = 0
+                else:
+                    if c.can_heal(self.target):
+                        c.heal(self.target)
+                    self.nav.move(c, self.target, self.movement)
+                    if c.can_heal(self.target):
+                        c.heal(self.target)
+            else:
+                self.nav.move(c, self.target, self.movement)
         if self.target_type != 3:
             my_pos = c.get_position()
             if not c.get_move_cooldown():

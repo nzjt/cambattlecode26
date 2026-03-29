@@ -1,5 +1,6 @@
 from cambc import *
 from Unit import Unit
+from consts import UNIMPORTANT
 
 
 class Gunner(Unit):
@@ -15,7 +16,12 @@ class Gunner(Unit):
             if c.can_fire(target):
                 building_id = c.get_tile_building_id(target)
                 if building_id is not None and c.get_team(building_id) == my_team:
-                    break
+                    if c.get_entity_type(building_id) in UNIMPORTANT:
+                        bb_id = c.get_tile_builder_bot_id(target)
+                        if c.get_team(bb_id) == my_team:
+                            break
+                    else:
+                        break
 
                 bb_id = c.get_tile_builder_bot_id(target)
                 if bb_id is not None and c.get_team(bb_id) == my_team:

@@ -19,15 +19,16 @@ class Sentinel(Unit):
             e_type = c.get_entity_type(e_id)
             pos = c.get_position(e_id)
             if e_type == EntityType.HARVESTER:
-                for d in CARDINAL:
-                    nxt = pos.add(d)
-                    if 0 <= nxt.x < W and 0 <= nxt.y < H and c.can_fire(nxt):
-                        building_id = c.get_tile_building_id(nxt)
-                        if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
-                            if score < 7:
-                                best = nxt
-                                score = 7
-                                break
+                if c.get_tile_env(pos) == Environment.ORE_TITANIUM:
+                    for d in CARDINAL:
+                        nxt = pos.add(d)
+                        if 0 <= nxt.x < W and 0 <= nxt.y < H and c.can_fire(nxt):
+                            building_id = c.get_tile_building_id(nxt)
+                            if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
+                                if score < 7:
+                                    best = nxt
+                                    score = 7
+                                    break
             else:
                 if c.get_team(e_id) == my_team:
                     continue

@@ -25,6 +25,8 @@ class Player:
         self.death_msg: str = "TLE!"
 
     def run(self, c: Controller) -> None:
+        if c.get_current_round() == 1000:
+            c.resign()
         if self.safe_exit:
             self.safe_exit = False
 
@@ -39,6 +41,8 @@ class Player:
             except Exception:
                 self.death_msg = traceback.format_exc()
                 print(self.death_msg)
+                self.safe_exit = True
+                self.unit = None
         else:
             print(
                 f"\033[0;31m{self.death_msg}\n"

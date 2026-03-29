@@ -29,10 +29,18 @@ class Core(Unit):
                 if c.can_spawn(pos):
                     c.spawn_builder(pos)
                     break
-        elif c.get_current_round() >= 150 and any(v == 3 for v in self.tracker.values()) and not self.has_tried_foundry:
-            for d in Direction:
-                pos = my_pos.add(d)
-                if c.can_spawn(pos):
-                    self.has_tried_foundry = True
-                    c.spawn_builder(pos)
-                    break
+        # elif c.get_current_round() >= 150 and any(v == 3 for v in self.tracker.values()) and not self.has_tried_foundry:
+        #     for d in Direction:
+        #         pos = my_pos.add(d)
+        #         if c.can_spawn(pos):
+        #             self.has_tried_foundry = True
+        #             c.spawn_builder(pos)
+        #             break
+        elif c.get_current_round() >= 100:
+            if c.get_global_resources()[0] >= 800:
+                for d in Direction:
+                    pos = my_pos.add(d)
+                    if c.can_spawn(pos):
+                        c.spawn_builder(pos)
+                        break
+

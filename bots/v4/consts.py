@@ -53,3 +53,25 @@ DESTROY_ENEMY = {
     EntityType.BRIDGE,
     EntityType.SPLITTER
 }
+ORDINAL = {
+    Direction.NORTH: 0,
+    Direction.NORTHEAST: 1,
+    Direction.EAST: 2,
+    Direction.SOUTHEAST: 3,
+    Direction.SOUTH: 4,
+    Direction.SOUTHWEST: 5,
+    Direction.WEST: 6,
+    Direction.NORTHWEST: 7
+}
+CAN_BUILD_LAUNCHER = {
+    None,
+    EntityType.MARKER,
+    EntityType.ROAD,
+    EntityType.BARRIER
+}
+CHAMBER_WALL = {
+    EntityType.ROAD,
+    EntityType.CORE,
+    EntityType.BARRIER,
+    EntityType.LAUNCHER
+}

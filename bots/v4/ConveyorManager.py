@@ -1,3 +1,5 @@
+from os import environ
+
 from cambc import *
 from AStarJPSOptimised import AStarJPSOptimised
 from TileManager import TileManager
@@ -120,7 +122,7 @@ class ConveyorManager:
             for e in CARDINAL:
                 cur = pos.add(e)
                 if 0 <= cur.x < W and 0 <= cur.y < H:
-                    if self.path_index[cur.y][cur.x] == 1000000 and c.get_tile_env(cur) in ConveyorManager.BUILD_BARRIER:
+                    if self.path_index[cur.y][cur.x] == 1000000 and c.get_tile_env(cur) != Environment.WALL:
                         building_id = c.get_tile_building_id(cur)
                         if c.get_team(building_id) == my_team:
                             if building_id is None or c.get_entity_type(building_id) in UNIMPORTANT:
@@ -161,7 +163,11 @@ class ConveyorManager:
                             if c.can_fire(my_pos):
                                 c.fire(my_pos)
                             return
+
                     if dist <= 2:
+                        if c.get_action_cooldown():
+                            return
+
                         d: Direction = my_pos.direction_to(self.path[0])
                         if not c.get_move_cooldown() and (c.can_move(d) or c.get_global_resources()[0] >= c.get_road_cost()[0]):
                             if c.can_destroy(self.path[0]):
@@ -170,9 +176,11 @@ class ConveyorManager:
                                 c.build_road(self.path[0])
                             movement.move(d)
                             on_ore = True
+                        else:
+                            return
                     else:
                         self.nav.move(c, self.path[0], movement)
-                    return
+                        return
 
         do_build: bool = False
         if on_ore:
@@ -181,7 +189,9 @@ class ConveyorManager:
 
             pos: Position = self.path[1]
             do_build = True
-            build_barriers()
+            if not build_barriers():
+                return
+
             building_id = c.get_tile_building_id(pos)
             if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
                 if movement.can_move(my_pos.direction_to(pos)) and not c.get_action_cooldown():
@@ -193,6 +203,61 @@ class ConveyorManager:
                         c.build_harvester(self.path[0])
                 return
 
+        if my_pos.distance_squared(self.path[0]) <= 13:
+            mine: list[bool] = [False] * 4
+            enemy: list[bool] = [False] * 4
+            turret: list[bool] = [False] * 4
+            for i in range(4):
+                d: Direction = CARDINAL[i]
+                cur = self.path[0].add(d)
+                if c.get_tile_env(cur) == Environment.WALL:
+                    continue
+                building_id = c.get_tile_building_id(cur)
+                e_type = c.get_entity_type(building_id)
+                if c.get_team(building_id) == my_team or e_type == EntityType.MARKER:
+                    bb_id = c.get_tile_builder_bot_id(cur)
+                    mine[i] = bb_id is None or bb_id == my_id
+                else:
+                    enemy[i] = True
+                    turret[i] = e_type in TURRET
+
+            for i in range(4):
+                if turret[i]:
+                    if mine[i - 1]:
+                        # building_id = c.get_tile_building_id(self.path[0].add(CARDINAL[i]))
+                        # d: Direction = self.path[0].add(CARDINAL[i]).direction_to(self.path[0].add(CARDINAL[i - 1]))
+                        # if abs()
+                        j = i - 1
+                    elif mine[i + 1]:
+                        j = (i + 1) % 4
+                    else:
+                        continue
+
+                    cur = self.path[0].add(CARDINAL[j])
+                    building_id = c.get_tile_building_id(cur)
+                    d: Direction = cur.direction_to(self.path[0].add(CARDINAL[i]))
+                    if building_id is not None and c.get_entity_type(building_id) == EntityType.GUNNER:
+                        if c.get_direction(building_id) == d:
+                            continue
+
+                    dist = my_pos.distance_squared(cur)
+                    if not dist:
+                        for d in DIRECTIONS:
+                            if movement.can_move(d):
+                                movement.move(d)
+                                my_pos = c.get_position()
+                                dist = my_pos.distance_squared(cur)
+                                break
+
+                    if 1 <= dist <= 2:
+                        if c.get_global_resources()[0] >= c.get_gunner_cost()[0] and not c.get_action_cooldown():
+                            if c.can_destroy(cur):
+                                c.destroy(cur)
+                            c.build_gunner(cur, d)
+                    else:
+                        self.nav.move(c, cur, movement)
+                    return
+
         protected = tile_manager.protected
         while self.launcher_index < len(self.path) - 1:
             xi, yi = self.path[self.launcher_index]
@@ -203,18 +268,26 @@ class ConveyorManager:
 
         if self.index >= self.launcher_index + 1:
             pos = self.path[self.launcher_index]
-            if my_pos != pos:
+            dist = my_pos.distance_squared(pos)
+            if dist > 2:
                 self.nav.move(c, pos, movement)
                 my_pos = c.get_position()
+                dist = my_pos.distance_squared(pos)
 
-            if my_pos == pos and c.get_global_resources()[0] >= c.get_launcher_cost()[0] and not c.get_action_cooldown():
+            if dist <= 2 and c.get_global_resources()[0] >= c.get_launcher_cost()[0] and not c.get_action_cooldown():
                 best: Position | None = None
                 mx: int = 0
+                destroy: Position | None = None
                 for d in DIRECTIONS:
                     cur = pos.add(d)
                     if 0 <= cur.x < W and 0 <= cur.y < H:
                         building_id = c.get_tile_building_id(cur)
-                        if (building_id is not None and c.get_entity_type(building_id) not in UNIMPORTANT) or c.get_team(building_id) != my_team:
+                        e_type = c.get_entity_type(building_id)
+                        if c.get_team(building_id) != my_team:
+                            if e_type in DESTROY_ENEMY:
+                                destroy = cur
+                            continue
+                        if building_id is not None and e_type not in CAN_BUILD_LAUNCHER:
                             continue
                         if c.get_tile_env(cur) != Environment.EMPTY:
                             continue
@@ -229,13 +302,25 @@ class ConveyorManager:
                             mx = i
 
                 if best is None:
-                    # TODO
+                    if destroy is not None:
+                        if my_pos != destroy:
+                            self.nav.move(c, destroy, movement)
+                            my_pos = c.get_position()
+
+                        if my_pos == destroy:
+                            if c.can_fire(my_pos):
+                                c.fire(my_pos)
                     return
                 else:
-                    if c.can_destroy(best):
-                        c.destroy(best)
-                    c.build_launcher(best)
-                    self.launcher_index = mx
+                    if dist:
+                        self.nav.move(c, pos, movement)
+                        my_pos = c.get_position()
+
+                    if my_pos == pos and not c.get_action_cooldown() and c.get_tile_builder_bot_id(best) is None:
+                        if c.can_destroy(best):
+                            c.destroy(best)
+                        c.build_launcher(best)
+                        self.launcher_index = mx
                     return
             else:
                 return
@@ -301,11 +386,7 @@ class ConveyorManager:
 
             if keep_gunner:
                 if my_pos != self.path[self.index - 1]:
-                    xi, yi = self.path[self.index - 1]
-                    d: Direction = bfs.bfs_to_pos(xi - my_pos.x, yi - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
-                    if d is not None and d != Direction.CENTRE:
-                        movement.move(d)
-
+                    self.nav.move(c, self.path[self.index - 1], movement)
                 return
             else:
                 if c.can_destroy(pos):
@@ -321,21 +402,27 @@ class ConveyorManager:
                     else:
                         return
 
-        need_gunner = c.is_in_vision(pos)
+        building_id = c.get_tile_building_id(pos)
+        e_type = c.get_entity_type(building_id)
+        need_gunner = c.get_team(building_id) != my_team and e_type != EntityType.MARKER
         if need_gunner:
-            building_id = c.get_tile_building_id(pos)
-            need_gunner &= c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER
-            if need_gunner:
+            if e_type in DESTROY_ENEMY:
+                if my_pos != pos:
+                    self.nav.move(c, pos, movement)
+                if c.can_fire(pos):
+                    c.fire(pos)
+                return
+            else:
                 self.index -= 1
                 if not self.index:
                     return
                 pos = self.path[self.index]
-            else:
-                nxt = self.path[self.index + 1]
-                need_gunner = c.is_in_vision(nxt)
-                if need_gunner:
-                    building_id = c.get_tile_building_id(nxt)
-                    need_gunner &= c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER
+        else:
+            nxt = self.path[self.index + 1]
+            need_gunner = c.is_in_vision(nxt)
+            if need_gunner:
+                building_id = c.get_tile_building_id(nxt)
+                need_gunner &= c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in DESTROY_ENEMY
         nxt = self.path[self.index + 1]
 
         if my_pos.distance_squared(pos) <= 2:
