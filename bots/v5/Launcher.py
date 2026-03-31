@@ -43,7 +43,7 @@ class Launcher(Unit):
             cur = None
             for d in C.DIRECTIONS:
                 cur = my_pos.add(d)
-                if 0 <= cur.x < W and 0 <= cur.y < H:
+                if U.on_the_map(cur):
                     building_id = c.get_tile_building_id(cur)
                     if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
                         break
@@ -65,7 +65,7 @@ class Launcher(Unit):
 
                     for d in C.DIRECTIONS:
                         nxt = cur.add(d)
-                        if 0 <= nxt.x < W and 0 <= nxt.y < H and c.is_in_vision(nxt):
+                        if U.on_the_map(nxt) and c.is_in_vision(nxt):
                             b_id = c.get_tile_building_id(nxt)
                             if b_id is not None and c.get_entity_type(b_id) == EntityType.LAUNCHER:
                                 if c.get_team(b_id) == my_team:
@@ -75,7 +75,7 @@ class Launcher(Unit):
                     c.draw_indicator_line(my_pos, friend, 0, 128, 255)
                     for d in C.DIRECTIONS:
                         nxt = friend.add(d)
-                        if 0 <= nxt.x < W and 0 <= nxt.y < H and c.is_in_vision(nxt):
+                        if U.on_the_map(nxt) and c.is_in_vision(nxt):
                             if c.is_tile_passable(nxt):
                                 best = nxt
                                 break

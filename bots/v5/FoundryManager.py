@@ -4,6 +4,7 @@ from Movement import Movement
 from consts import CARDINAL
 from consts import UNIMPORTANT
 from Bfs import Bfs
+import utils as U
 
 
 class FoundryManager:
@@ -29,13 +30,13 @@ class FoundryManager:
                         left_good: bool = False
                         nxt = pos.add(d.rotate_left().rotate_left())
                         if nxt.distance_squared(self.home) <= 5:
-                            if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                            if U.on_the_map(nxt):
                                 building_id = c.get_tile_building_id(nxt)
                                 left_good |= building_id is None or (c.get_entity_type(building_id) in UNIMPORTANT and c.get_team(building_id) == my_team)
                         right_good: bool = False
                         nxt = pos.add(d.rotate_right().rotate_right())
                         if nxt.distance_squared(self.home) <= 5:
-                            if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                            if U.on_the_map(nxt):
                                 building_id = c.get_tile_building_id(nxt)
                                 right_good |= building_id is None or (c.get_entity_type(building_id) in UNIMPORTANT and c.get_team(building_id) == my_team)
 

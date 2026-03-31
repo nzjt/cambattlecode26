@@ -188,7 +188,7 @@ class TileManager:
                             has_space, has_conveyor = False, False
                             for d in C.CARDINAL:
                                 cur: Position = pos.add(d)
-                                if 0 <= cur.x <= W - 1 and 0 <= cur.y <= H - 1:
+                                if 0 <= cur.x < W and 0 <= cur.y < H:
                                     building_id = c.get_tile_building_id(cur)
                                     if building_id is None:
                                         has_space |= c.get_tile_env(cur) == Environment.EMPTY

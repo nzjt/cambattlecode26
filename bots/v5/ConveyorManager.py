@@ -121,7 +121,7 @@ class ConveyorManager:
             pos: Position = self.path[0]
             for e in C.CARDINAL:
                 cur = pos.add(e)
-                if 0 <= cur.x < W and 0 <= cur.y < H:
+                if U.on_the_map(cur):
                     if self.path_index[cur.y][cur.x] == 1000000 and c.get_tile_env(cur) != Environment.WALL:
                         building_id = c.get_tile_building_id(cur)
                         if c.get_team(building_id) == my_team:
@@ -277,7 +277,7 @@ class ConveyorManager:
                 destroy: Position | None = None
                 for d in C.DIRECTIONS:
                     cur = pos.add(d)
-                    if 0 <= cur.x < W and 0 <= cur.y < H:
+                    if U.on_the_map(cur):
                         building_id = c.get_tile_building_id(cur)
                         e_type = c.get_entity_type(building_id)
                         if c.get_team(building_id) != my_team:
@@ -373,7 +373,7 @@ class ConveyorManager:
             cur: Position = pos
             for _ in range(3 if di in C.CARDINAL else 2):
                 cur = cur.add(di)
-                if 0 <= cur.x < W and 0 <= cur.y < H and c.get_tile_env(cur) != Environment.WALL:
+                if U.on_the_map(cur) and c.get_tile_env(cur) != Environment.WALL:
                     building_id = c.get_tile_building_id(cur)
                     if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
                         keep_gunner = c.get_team(building_id) != my_team
@@ -474,5 +474,4 @@ class ConveyorManager:
                 d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
 
             if d is not None and d != Direction.CENTRE:
-                print(pos)
                 movement.move(d)

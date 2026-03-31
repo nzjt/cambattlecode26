@@ -1,6 +1,7 @@
 from cambc import *
 from Unit import Unit
 import consts as C
+import utils as U
 
 
 class Sentinel(Unit):
@@ -25,7 +26,7 @@ class Sentinel(Unit):
                 if c.get_tile_env(pos) == Environment.ORE_TITANIUM:
                     for d in C.CARDINAL:
                         nxt = pos.add(d)
-                        if 0 <= nxt.x < W and 0 <= nxt.y < H and c.can_fire(nxt):
+                        if U.on_the_map(nxt) and c.can_fire(nxt):
                             building_id = c.get_tile_building_id(nxt)
                             if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
                                 if score < 7:

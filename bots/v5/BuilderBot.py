@@ -59,7 +59,7 @@ class BuilderBot(Unit):
                                 if not trustworthy:
                                     for e in Direction:
                                         nxt = pos.add(e)
-                                        if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                                        if U.on_the_map(nxt):
                                             bb_id = c.get_tile_builder_bot_id(nxt)
                                             if bb_id is not None and bb_id != my_id and c.get_team(bb_id) == my_team:
                                                 return False
@@ -79,7 +79,7 @@ class BuilderBot(Unit):
                     has_space, has_enemy = False, False
                     for d in C.CARDINAL:
                         nxt = self.target.add(d)
-                        if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                        if U.on_the_map(nxt):
                             building_id = c.get_tile_building_id(nxt)
                             if building_id is None:
                                 has_space = c.get_tile_env(nxt) != Environment.WALL
@@ -152,7 +152,7 @@ class BuilderBot(Unit):
                             has_space, has_enemy = False, False
                             for d in C.CARDINAL:
                                 nxt = pos.add(d)
-                                if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                                if U.on_the_map(nxt):
                                     building_id = c.get_tile_building_id(nxt)
                                     if building_id is None:
                                         has_space = c.get_tile_env(nxt) != Environment.WALL
@@ -200,7 +200,7 @@ class BuilderBot(Unit):
                         count = 0
                         for e in C.CARDINAL:
                             cur = pos.add(e)
-                            if 0 <= cur.x < W and 0 <= cur.y < H:
+                            if U.on_the_map(cur):
                                 building_id = c.get_tile_building_id(cur)
                                 e_type = c.get_entity_type(building_id)
                                 if e_type == EntityType.SPLITTER:
@@ -212,7 +212,7 @@ class BuilderBot(Unit):
                                 cur = pos.add(d)
                                 if cur.distance_squared(self.home) > 8:
                                     continue
-                                if not (0 <= cur.x < W and 0 <= cur.y < H):
+                                if not U.on_the_map(cur):
                                     continue
                                 building_id = c.get_tile_building_id(cur)
                                 if building_id is not None and c.get_entity_type(building_id) not in C.UNIMPORTANT:
@@ -220,14 +220,14 @@ class BuilderBot(Unit):
                                 cur = cur.add(d)
                                 if cur.distance_squared(self.home) > 8:
                                     continue
-                                if not (0 <= cur.x < W and 0 <= cur.y < H):
+                                if not U.on_the_map(cur):
                                     continue
                                 building_id = c.get_tile_building_id(cur)
                                 if building_id is not None and c.get_entity_type(building_id) not in C.UNIMPORTANT:
                                     break
                                 for e in Direction:
                                     adj = cur.add(e)
-                                    if 0 <= adj.x < W and 0 <= adj.y < H:
+                                    if U.on_the_map(adj):
                                         building_id = c.get_tile_building_id(adj)
                                         if building_id is not None and c.get_entity_type(building_id) not in C.CHAMBER_WALL:
                                             break
@@ -397,7 +397,7 @@ class BuilderBot(Unit):
             sentinel_targets: list[Position] = []
             for d in C.CARDINAL:
                 nxt = self.target.add(d)
-                if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                if U.on_the_map(nxt):
                     if c.is_in_vision(nxt):
                         building_id = c.get_tile_building_id(nxt)
                         if building_id is None or c.get_team(building_id) == my_team and c.get_entity_type(building_id) in C.UNIMPORTANT:
@@ -426,7 +426,7 @@ class BuilderBot(Unit):
                         if c.can_build_sentinel(target, Direction.NORTH):
                             d = target.direction_to(self.target)
                             nxt = target.add(d.rotate_left())
-                            if 0 <= nxt.x < W and 0 <= nxt.y < H:
+                            if U.on_the_map(nxt):
                                 building_id = c.get_tile_building_id(nxt)
                                 if c.get_team(building_id) != my_team:
                                     d = d.rotate_left()
@@ -479,7 +479,7 @@ class BuilderBot(Unit):
                                         if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_barrier_cost()[0]:
                                             if c.can_destroy(cur):
                                                 c.destroy(cur)
-                                            c.build_barrier(cur)
+                                            c.build_barrier(cur)  # TODO
                                         else:
                                             break
                             else:
@@ -554,8 +554,7 @@ class BuilderBot(Unit):
             if not c.get_move_cooldown():
                 for d in C.DIRECTIONS:
                     pos: Position = my_pos.add(d)
-                    x, y = pos
-                    if 0 <= x < W and 0 <= y < H:
+                    if U.on_the_map(pos):
                         bbot_id = c.get_tile_builder_bot_id(pos)
                         if bbot_id is not None and c.get_team(bbot_id) == my_team:
                             building_id = c.get_tile_building_id(pos)

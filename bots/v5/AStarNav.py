@@ -20,6 +20,7 @@ class AStarNav(Nav):
             if hi - lo >= 2:
                 x, y = pos
                 g[y][x] = -1
+        a_star.c = c
         a_star.compute(c.get_position(), [target])
 
         x, y = c.get_position()
