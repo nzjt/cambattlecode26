@@ -4,7 +4,7 @@ from TileManager import TileManager
 from Movement import Movement
 from Bfs import Bfs
 from utils import normalise_on_grid
-from consts import *
+import consts as C
 
 
 class ConveyorManagerBarrier:

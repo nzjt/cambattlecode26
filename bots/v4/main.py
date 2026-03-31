@@ -7,7 +7,6 @@ from Core import Core
 from BuilderBot import BuilderBot
 from Gunner import Gunner
 from Sentinel import Sentinel
-from consts import *
 from Launcher import Launcher
 
 
@@ -25,24 +24,22 @@ class Player:
         self.death_msg: str = "TLE!"
 
     def run(self, c: Controller) -> None:
-        if c.get_current_round() == 1000:
-            c.resign()
         if self.safe_exit:
             self.safe_exit = False
 
             if self.unit is None:
                 random.seed(c.get_id())
                 my_type = c.get_entity_type(c.get_id())
-                self.unit = Player.CLASS[my_type]()
+                self.unit = Player.CLASS[my_type](c)
 
             try:
                 self.unit.run(c)
                 self.safe_exit = True
             except Exception:
                 self.death_msg = traceback.format_exc()
-                print(self.death_msg)
-                self.safe_exit = True
-                self.unit = None
+                # print(self.death_msg)
+                # self.safe_exit = True
+                # self.unit = None
         else:
             print(
                 f"\033[0;31m{self.death_msg}\n"

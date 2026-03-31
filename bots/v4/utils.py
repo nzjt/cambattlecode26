@@ -67,3 +67,5 @@ def normalise(waypoints: list[Position], max_len: int = -1):
                 return path
 
     return path
+
+on_the_map = None

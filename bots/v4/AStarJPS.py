@@ -1,6 +1,6 @@
 from cambc import *
 from TileManager import TileManager
-from consts import *
+import consts as C
 
 
 class AStarJPS:

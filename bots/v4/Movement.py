@@ -1,5 +1,5 @@
 from cambc import *
-from consts import *
+import consts as C
 
 
 class Movement:
@@ -67,7 +67,7 @@ class Movement:
                 if building_id is None:
                     return c.can_build_road(nxt)
                 else:
-                    return c.get_team(building_id) == c.get_team() and c.get_entity_type(building_id) in EMERGENCY_DESTROY
+                    return c.get_team(building_id) == c.get_team() and c.get_entity_type(building_id) in C.EMERGENCY_DESTROY
             else:
                 return False
 

@@ -4,6 +4,9 @@ from consts import UNIMPORTANT
 
 
 class Gunner(Unit):
+    def __init__(self, c: Controller):
+        super().__init__(c)
+
     def run(self, c: Controller):
         my_id = c.get_id()
         my_pos = c.get_position(my_id)

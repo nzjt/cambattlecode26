@@ -1,5 +1,5 @@
 from cambc import *
-from consts import *
+import consts as C
 
 
 class TileManager:
@@ -186,7 +186,7 @@ class TileManager:
                             if pos.distance_squared(home) <= 5:
                                 continue
                             has_space, has_conveyor = False, False
-                            for d in CARDINAL:
+                            for d in C.CARDINAL:
                                 cur: Position = pos.add(d)
                                 if 0 <= cur.x <= W - 1 and 0 <= cur.y <= H - 1:
                                     building_id = c.get_tile_building_id(cur)
@@ -196,7 +196,7 @@ class TileManager:
                                         if c.get_team(building_id) != my_team:
                                             continue
                                         e_type = c.get_entity_type(building_id)
-                                        if e_type in CONVEYOR_VARIANT:
+                                        if e_type in C.CONVEYOR_VARIANT:
                                             has_conveyor = True
                                             break
                                         elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:

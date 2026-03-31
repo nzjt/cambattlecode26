@@ -1,9 +1,12 @@
 from cambc import *
 from Unit import Unit
-from consts import *
+import consts as C
 
 
 class Sentinel(Unit):
+    def __init__(self, c: Controller):
+        super().__init__(c)
+
     def run(self, c: Controller):
         if c.get_action_cooldown():
             return
@@ -20,11 +23,11 @@ class Sentinel(Unit):
             pos = c.get_position(e_id)
             if e_type == EntityType.HARVESTER:
                 if c.get_tile_env(pos) == Environment.ORE_TITANIUM:
-                    for d in CARDINAL:
+                    for d in C.CARDINAL:
                         nxt = pos.add(d)
                         if 0 <= nxt.x < W and 0 <= nxt.y < H and c.can_fire(nxt):
                             building_id = c.get_tile_building_id(nxt)
-                            if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
+                            if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
                                 if score < 7:
                                     best = nxt
                                     score = 7
@@ -46,13 +49,13 @@ class Sentinel(Unit):
                         if score < 1:
                             best = pos
                             score = 1
-                    elif e_type in TURRET:
+                    elif e_type in C.TURRET:
                         if score < 6:
                             best = pos
                             score = 6
                     elif e_type == EntityType.BUILDER_BOT:
                         building_id = c.get_tile_building_id(pos)
-                        if building_id is None or c.get_team(building_id) != my_team or c.get_entity_type(building_id) in UNIMPORTANT:
+                        if building_id is None or c.get_team(building_id) != my_team or c.get_entity_type(building_id) in C.UNIMPORTANT:
                             if score < 3:
                                 best = pos
                                 score = 3

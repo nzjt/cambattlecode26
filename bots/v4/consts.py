@@ -75,3 +75,5 @@ CHAMBER_WALL = {
     EntityType.BARRIER,
     EntityType.LAUNCHER
 }
+W: int = 0
+H: int = 0

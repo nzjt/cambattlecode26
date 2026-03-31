@@ -1,12 +1,13 @@
 import random
-from math import frexp
-
 from cambc import *
 from Unit import *
-from consts import *
+import consts as C
 
 
 class Launcher(Unit):
+    def __init__(self, c: Controller):
+        super().__init__(c)
+
     def run(self, c: Controller):
         my_pos = c.get_position()
         my_team = c.get_team()
@@ -29,7 +30,7 @@ class Launcher(Unit):
                             break
                 continue
 
-            if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
+            if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
                 continue
 
             dist = max(abs(pos.x - my_pos.x), abs(pos.y - my_pos.y))
@@ -40,11 +41,11 @@ class Launcher(Unit):
 
         if best_score != -1:
             cur = None
-            for d in DIRECTIONS:
+            for d in C.DIRECTIONS:
                 cur = my_pos.add(d)
                 if 0 <= cur.x < W and 0 <= cur.y < H:
                     building_id = c.get_tile_building_id(cur)
-                    if c.get_entity_type(building_id) in CONVEYOR_VARIANT:
+                    if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
                         break
 
             if cur is not None:
@@ -52,17 +53,17 @@ class Launcher(Unit):
                 while True:
                     building_id = c.get_tile_building_id(cur)
                     e_type = c.get_entity_type(building_id)
-                    if e_type in MONOCHILD_CONVEYOR:
-                        cur = cur.add(c.get_direction(building_id))
-                    elif e_type == EntityType.BRIDGE:
+                    if e_type == EntityType.BRIDGE:
                         cur = c.get_bridge_target(building_id)
+                    elif e_type in C.MONOCHILD_CONVEYOR:
+                        cur = cur.add(c.get_direction(building_id))
                     else:
                         break
 
                     if not c.is_in_vision(cur):
                         break
 
-                    for d in DIRECTIONS:
+                    for d in C.DIRECTIONS:
                         nxt = cur.add(d)
                         if 0 <= nxt.x < W and 0 <= nxt.y < H and c.is_in_vision(nxt):
                             b_id = c.get_tile_building_id(nxt)
@@ -72,7 +73,7 @@ class Launcher(Unit):
 
                 if friend is not None and friend != my_pos:
                     c.draw_indicator_line(my_pos, friend, 0, 128, 255)
-                    for d in DIRECTIONS:
+                    for d in C.DIRECTIONS:
                         nxt = friend.add(d)
                         if 0 <= nxt.x < W and 0 <= nxt.y < H and c.is_in_vision(nxt):
                             if c.is_tile_passable(nxt):
@@ -90,7 +91,7 @@ class Launcher(Unit):
             pos = c.get_position(bb_id)
             building_id = c.get_tile_building_id(pos)
             if c.can_launch(pos, best):
-                if c.get_entity_type(building_id) in CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
+                if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
                     c.launch(pos, best)
                     return
                 best_enemy = pos  # TODO

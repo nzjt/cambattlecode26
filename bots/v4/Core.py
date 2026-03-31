@@ -3,11 +3,14 @@ from Unit import Unit
 
 
 class Core(Unit):
-    def __init__(self):
+    def __init__(self, c: Controller):
+        super().__init__(c)
         self.tracker: dict[Position, int] = {}
         self.has_tried_foundry: bool = False
 
     def run(self, c: Controller):
+        if c.get_current_round() == 400:
+            c.resign()
         my_pos = c.get_position(c.get_id())
 
         for building_id in c.get_nearby_buildings(5):

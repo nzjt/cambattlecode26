@@ -1,7 +1,7 @@
 from Nav import *
 from TileManager import TileManager
 from AStarJPSOptimised import AStarJPSOptimised
-from utils import normalise
+import utils as U
 from Bfs import Bfs
 
 
@@ -23,7 +23,7 @@ class AStarNav(Nav):
         a_star.compute(c.get_position(), [target])
 
         x, y = c.get_position()
-        path: list[Position] = normalise(a_star.path, 16)
+        path: list[Position] = U.normalise(a_star.path, 16)
         for i in range(1, len(path)):
             c.draw_indicator_line(path[i - 1], path[i], 255, 0, 128)
         prefix: list[tuple[int, int]] = [(path[i][0] - x, path[i][1] - y) for i in range(1, len(path))]
