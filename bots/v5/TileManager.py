@@ -1,5 +1,6 @@
 from cambc import *
 import consts as C
+import utils as U
 
 
 class TileManager:
@@ -16,24 +17,24 @@ class TileManager:
         Environment.ORE_AXIONITE: 4
     }
 
-    def __init__(self, c: Controller, home: Position):
-        W: int = c.get_map_width()
-        H: int = c.get_map_height()
+    def __init__(self, home: Position):
+        W: int = C.W
+        H_plus_4 = C.H + 4
         self.home: Position = home
-        self.pass_bitset: list[int] = [0] * (H + 4)
-        self.buildable_bitset: list[int] = [0] * (H + 4)
-        self.barrier_bitset: list[int] = [0] * (H + 4)
-        self.ore_grid: list[int] = [0] * (H + 4)
+        self.pass_bitset: list[int] = [0] * H_plus_4
+        self.buildable_bitset: list[int] = [0] * H_plus_4
+        self.barrier_bitset: list[int] = [0] * H_plus_4
+        self.ore_grid: list[int] = [0] * H_plus_4
         self.ally: int = 0
         self.enemy: int = 0
         self.pass_: int = 0
         self.ore: int = 0
         self.buildable: int = 0
         self.barrier: int = 0
-        self.build_harvester = [[True] * W for _ in range(H)]
-        self.ban_harvester = [[False] * W for _ in range(H)]
-        self.env_grid = [[0] * W for _ in range(H)]
-        self.pass_grid: list[list[bool]] = [[True] * W for _ in range(H)]
+        self.build_harvester = [[True] * W for _ in range(C.H)]
+        self.ban_harvester = [[False] * W for _ in range(C.H)]
+        self.env_grid = [[0] * W for _ in range(C.H)]
+        self.pass_grid: list[list[bool]] = [[True] * W for _ in range(C.H)]
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.protected: list[list[bool]] = []
@@ -89,8 +90,7 @@ class TileManager:
 
         pass_bitset, buildable_bitset, ore_bitset, barrier_bitset = self.pass_bitset, self.buildable_bitset, self.ore_grid, self.barrier_bitset
         env_grid, pass_grid = self.env_grid, self.pass_grid
-        W, H = c.get_map_width(), c.get_map_height()
-        for yi in range(max(0, y - 4), min(H, y + 5)):
+        for yi in range(max(0, y - 4), min(C.H, y + 5)):
             pass_bitset[yi] &= clear
             buildable_bitset[yi] &= clear
             barrier_bitset[yi] &= clear
@@ -108,7 +108,8 @@ class TileManager:
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
 
-        protected = self.protected = [[False] * (W + 1) for _ in range(H + 1)]
+        W_plus_1: int = C.W + 1
+        protected = self.protected = [[False] * W_plus_1 for _ in range(C.H)]
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
@@ -188,7 +189,7 @@ class TileManager:
                             has_space, has_conveyor = False, False
                             for d in C.CARDINAL:
                                 cur: Position = pos.add(d)
-                                if 0 <= cur.x < W and 0 <= cur.y < H:
+                                if U.on_the_map(cur):
                                     building_id = c.get_tile_building_id(cur)
                                     if building_id is None:
                                         has_space |= c.get_tile_env(cur) == Environment.EMPTY

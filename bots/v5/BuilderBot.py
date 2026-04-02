@@ -40,7 +40,6 @@ class BuilderBot(Unit):
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
         my_team = c.get_team(my_id)
-        W, H = c.get_map_width(), c.get_map_height()
         x, y = my_pos
 
         def needs_repair(pos: Position, trustworthy: bool = False) -> bool:
@@ -254,13 +253,12 @@ class BuilderBot(Unit):
         my_id = c.get_id()
         my_pos = c.get_position()
         my_team = c.get_team()
-        W, H = c.get_map_width(), c.get_map_height()
 
         if self.home is None:
             self.birth = c.get_current_round()
             self.home = c.get_position(c.get_tile_building_id(my_pos))
             self.movement = Movement()
-            self.tile_manager = TileManager(c, self.home)
+            self.tile_manager = TileManager(self.home)
             self.bfs = Bfs(self.home, self.tile_manager)
             self.nav = AStarNav(self.tile_manager, self.bfs)
             self.prev_resources = c.get_global_resources()[0]
@@ -271,7 +269,6 @@ class BuilderBot(Unit):
             #         self.target_type = 6
 
         self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
-        delta = c.get_global_resources()[0] - self.prev_resources
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
@@ -390,6 +387,7 @@ class BuilderBot(Unit):
                 if dist > 2:
                     self.nav.move(c, self.target, self.movement)
         elif self.target_type == 3:
+            print("yo")
             self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs, False)
             if not self.conveyor_manager.index:
                 self.target_type = 0

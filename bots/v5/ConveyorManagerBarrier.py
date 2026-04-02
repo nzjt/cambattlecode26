@@ -14,8 +14,6 @@ class ConveyorManagerBarrier:
     }
 
     def __init__(self, c: Controller, tile_manager: TileManager, start: Position, target: Position):
-        W: int = c.get_map_width()
-
         a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager)
         x, y = start
         g: list[list[int]] = a_star.g

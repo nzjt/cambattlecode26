@@ -11,7 +11,6 @@ class Launcher(Unit):
     def run(self, c: Controller):
         my_pos = c.get_position()
         my_team = c.get_team()
-        W, H = c.get_map_width(), c.get_map_height()
 
         best: Position | None = None
         best_score: int = 0

@@ -25,10 +25,8 @@ class AStarJPSOptimised:
     def compute(self, start: Position, end: list[Position], is_core: bool = False):
         g = self.g
         par = self.par
-        # print("time3", self.c.get_cpu_time_elapsed())
 
         queue: list[list[tuple[int, int, int]]] = [[] for _ in range(200)]
-#         print("time4", self.c.get_cpu_time_elapsed())
         x, y = start
         g[y][x] = AStarJPSOptimised.INF
 
@@ -253,9 +251,7 @@ class AStarJPSOptimised:
             add_source(xi - 1, yi - 1, 7)
         else:
             for xi, yi in end:
-                # print("time5", self.c.get_cpu_time_elapsed())
                 g[yi][xi] = 0
-#                 print("time6", self.c.get_cpu_time_elapsed())
                 jp = scan_N(xi, yi)
                 if jp:
                     add(*jp, yi - jp[1], 0)
@@ -439,8 +435,8 @@ class AStarJPSOptimised:
             expand_NW
         )
 
-        for i in range(0, 500):
-            for xi, yi, d in queue[i]:
+        for subqueue in queue:
+            for xi, yi, d in subqueue:
                 if xi == x and yi == y:
                     break
                 f[d](xi, yi)

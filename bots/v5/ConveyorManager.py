@@ -17,8 +17,6 @@ class ConveyorManager:
     }
 
     def __init__(self, c: Controller, tile_manager: TileManager, start: Position, target: Position, nav: Nav):
-        W: int = c.get_map_width()
-
         a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager)
         x, y = start
         g: list[list[int]] = a_star.g
@@ -55,8 +53,8 @@ class ConveyorManager:
 
     def index_path(self, c: Controller):
         path: list[Position] = self.path
-        W, H = c.get_map_width(), c.get_map_height()
-        path_index = self.path_index = [[1000000] * (W + 1) for _ in range(H + 1)]
+        W_plus_1: int = C.W + 1
+        path_index = self.path_index = [[1000000] * W_plus_1 for _ in range(C.H + 1)]
         for i in range(len(path)):
             x, y = path[i]
             path_index[y][x] = i
@@ -110,7 +108,6 @@ class ConveyorManager:
         my_team = c.get_team()
         my_pos = c.get_position(my_id)
         on_ore: bool = not repair and my_pos == self.path[0]
-        W, H = c.get_map_width(), c.get_map_height()
         enemy_near: bool = False
         for bb_id in c.get_nearby_units(8):
             if c.get_team(bb_id) != my_team:
@@ -122,7 +119,13 @@ class ConveyorManager:
             for e in C.CARDINAL:
                 cur = pos.add(e)
                 if U.on_the_map(cur):
-                    if self.path_index[cur.y][cur.x] == 1000000 and c.get_tile_env(cur) != Environment.WALL:
+                    e_type = c.get_tile_env(cur)
+                    if self.path_index[cur.y][cur.x] == 1000000 and e_type != Environment.WALL:
+                        if e_type == Environment.ORE_TITANIUM:
+                            bb_id = c.get_tile_builder_bot_id(cur)
+                            if bb_id != my_id and c.get_team(bb_id) == my_team:
+                                continue
+
                         building_id = c.get_tile_building_id(cur)
                         if c.get_team(building_id) == my_team:
                             if building_id is None or c.get_entity_type(building_id) in C.UNIMPORTANT:

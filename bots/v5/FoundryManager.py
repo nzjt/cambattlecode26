@@ -18,7 +18,6 @@ class FoundryManager:
     def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs):
         if self.target is None:
             my_team = c.get_team()
-            W, H = c.get_map_width(), c.get_map_height()
 
             for building_id in c.get_nearby_buildings(13):
                 if c.get_entity_type(building_id) == EntityType.CONVEYOR:
