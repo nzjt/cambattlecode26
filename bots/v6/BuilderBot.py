@@ -35,6 +35,7 @@ class BuilderBot(Unit):
         self.has_econ: bool = False
         self.prev_resources: int = 1000
         self.has_harvester: bool = False
+        self.ores: set[Position] = set()
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -176,22 +177,21 @@ class BuilderBot(Unit):
                         e_type = c.get_entity_type(building_id)
                         if e_type == EntityType.BARRIER:
                             if self.is_troll or c.get_team(building_id) != my_team:
+                                self.ores.discard(pos)
                                 continue
                         elif e_type == EntityType.HARVESTER:
                             if self.is_troll:
+                                self.ores.discard(pos)
                                 continue
 
                         if c.get_tile_builder_bot_id(pos) is not None:
+                            self.ores.discard(pos)
                             continue
 
-                        dist = my_pos.distance_squared(pos)
-                        if self.target_type == 2:
-                            if dist >= self.target_dist:
-                                continue
-                        self.target = pos
+                        self.ores.add(pos)
                         self.target_type = 2
-                        self.target_dist = dist
-                        self.conveyor_manager = None
+                    else:
+                        self.ores.discard(pos)
 
                 building_id = c.get_tile_building_id(pos)
                 if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
@@ -227,26 +227,36 @@ class BuilderBot(Unit):
             #         self.foundry_manager = FoundryManager(self.home, self.birth + 25)
             #         self.target_type = 6
 
-        self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
+        # self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
 
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
                 self.target_type = 0
         elif self.target_type == 2:
-            if c.is_in_vision(self.target):
-                bb_id = c.get_tile_builder_bot_id(self.target)
-                if bb_id is not None and bb_id != my_id:
-                    self.target_type = 0
-                else:
-                    if self.is_troll:
-                        building_id = c.get_tile_building_id(self.target)
-                        e_type = c.get_entity_type(building_id)
-                        if c.get_team(building_id) == my_team:
-                            if e_type == EntityType.BARRIER or e_type == EntityType.HARVESTER:
-                                self.target_type = 0
-                        else:
-                            if e_type not in C.DESTROY_ENEMY:
-                                self.target_type = 0
+            if self.ores:
+                closest_dist: int = 10000
+                self.target = None
+                for pos in self.ores:
+                    dist = my_pos.distance_squared(pos)
+                    if dist < closest_dist:
+                        closest_dist = dist
+                        self.target = pos
+            else:
+                self.target_type = 0
+            # if c.is_in_vision(self.target):
+            #     bb_id = c.get_tile_builder_bot_id(self.target)
+            #     if bb_id is not None and bb_id != my_id:
+            #         self.target_type = 0
+            #     else:
+            #         if self.is_troll:
+            #             building_id = c.get_tile_building_id(self.target)
+            #             e_type = c.get_entity_type(building_id)
+            #             if c.get_team(building_id) == my_team:
+            #                 if e_type == EntityType.BARRIER or e_type == EntityType.HARVESTER:
+            #                     self.target_type = 0
+            #             else:
+            #                 if e_type not in C.DESTROY_ENEMY:
+            #                     self.target_type = 0
         elif self.target_type == 3:
             if self.conveyor_manager.done:
                 self.target_type = 0
@@ -339,7 +349,7 @@ class BuilderBot(Unit):
                     self.target_type = 0
             else:
                 if dist > 2:
-                    self.nav.move(c, self.target, self.movement)
+                    self.nav.multimove(c, list(self.ores), self.movement)
         elif self.target_type == 3:
             if not self.conveyor_manager.path:
                 if c.get_cpu_time_elapsed() <= 600:

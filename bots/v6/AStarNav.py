@@ -11,6 +11,9 @@ class AStarNav(Nav):
         self.bfs: Bfs = bfs
 
     def move(self, c: Controller, target: Position, movement: Movement) -> None:
+        self.multimove(c, [target], movement)
+
+    def multimove(self, c: Controller, targets: list[Position], movement: Movement) -> None:
         if c.get_move_cooldown():
             return
 
@@ -21,7 +24,7 @@ class AStarNav(Nav):
                 x, y = pos
                 g[y][x] = -1
         a_star.c = c
-        a_star.compute(c.get_position(), [target])
+        a_star.compute(c.get_position(), targets)
 
         if not a_star.path:
             U.debug("No path!")
