@@ -274,8 +274,8 @@ class BuilderBot(Unit):
 
                 if not self.is_troll:
                     if dist <= 2:
-                        self.conveyor_manager = ConveyorManager(self.nav)
-                        self.conveyor_manager.compute(c, self.tile_manager, self.target, self.home)
+                        self.conveyor_manager = ConveyorManager(self.nav, self.home)
+                        self.conveyor_manager.compute(c, self.tile_manager, self.target)
                         self.target_type = 3
 
         self.sense(c)
@@ -353,7 +353,7 @@ class BuilderBot(Unit):
         elif self.target_type == 3:
             if not self.conveyor_manager.path:
                 if c.get_cpu_time_elapsed() <= 600:
-                    self.conveyor_manager.compute(c, self.tile_manager, self.target, self.home, False)
+                    self.conveyor_manager.compute(c, self.tile_manager, self.target, False)
                     if not self.conveyor_manager.path:
                         self.tile_manager.ban_harvester[self.target.y][self.target.x] = True
                         self.target_type = 0
@@ -409,8 +409,8 @@ class BuilderBot(Unit):
         elif self.target_type == 5:
             if self.conveyor_manager is None:
                 if my_pos.distance_squared(self.target) <= 2:
-                    self.conveyor_manager = ConveyorManager(self.nav)
-                    self.conveyor_manager.compute(c, self.tile_manager, self.target, self.home)
+                    self.conveyor_manager = ConveyorManager(self.nav, self.home)
+                    self.conveyor_manager.compute(c, self.tile_manager, self.target)
                     self.conveyor_manager.index -= 1
                 else:
                     self.nav.move(c, self.target, self.movement)

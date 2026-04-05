@@ -16,22 +16,50 @@ class ConveyorManager:
         Environment.ORE_AXIONITE
     }
 
-    def __init__(self, nav: Nav):
+    def __init__(self, nav: Nav, home: Position):
         self.avoid_joining: bool = True
         self.path_index: list[list[bool]] | None = None
         self.path = []
         self.index = 1
         self.done: bool = False
         self.nav: Nav = nav
+        self.home: Position = home
 
-    def compute(self, c: Controller, tile_manager: TileManager, start: Position, target: Position, avoid_joining: bool = True):
+    def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
         if avoid_joining:
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
+            g: list[list[int]] = a_star.g
+            x, y = self.home
+            env_grid = tile_manager.env_grid
+            if env_grid[y - 2][x + 1] == 3:
+                g[y - 2][x + 1] = 1000000
+            if env_grid[y - 2][x + 2] == 3:
+                g[y - 2][x + 2] = 1000000
+            if env_grid[y - 1][x + 2] == 3:
+                g[y - 1][x + 2] = 1000000
+            if env_grid[y + 2][x + 1] == 3:
+                g[y + 2][x + 1] = 1000000
+            if env_grid[y + 2][x + 2] == 3:
+                g[y + 2][x + 2] = 1000000
+            if env_grid[y + 1][x + 2] == 3:
+                g[y + 1][x + 2] = 1000000
+            if env_grid[y - 2][x-+ 1] == 3:
+                g[y - 2][x - 1] = 1000000
+            if env_grid[y - 2][x - 2] == 3:
+                g[y - 2][x - 2] = 1000000
+            if env_grid[y - 1][x - 2] == 3:
+                g[y - 1][x - 2] = 1000000
+            if env_grid[y + 2][x - 1] == 3:
+                g[y + 2][x - 1] = 1000000
+            if env_grid[y + 2][x - 2] == 3:
+                g[y + 2][x - 2] = 1000000
+            if env_grid[y + 1][x - 2] == 3:
+                g[y + 1][x - 2] = 1000000
         else:
             self.avoid_joining = False
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 1)
+            g: list[list[int]] = a_star.g
         x, y = start
-        g: list[list[int]] = a_star.g
         blocked_N: bool = g[y - 1][x] == -1
         blocked_E: bool = g[y][x + 1] == -1
         blocked_S: bool = g[y + 1][x] == -1
@@ -45,7 +73,7 @@ class ConveyorManager:
         if blocked_W and blocked_N:
             g[y - 1][x - 1] = -1
 
-        a_star.compute(start, [target], True)
+        a_star.compute(start, [self.home], True)
 
         if a_star.path:
             path = self.path = U.normalise_on_grid(a_star.path, tile_manager.env_grid)
@@ -377,24 +405,40 @@ class ConveyorManager:
                         c.build_gunner(pos, d)
             else:
                 if not c.get_move_cooldown() and not c.get_action_cooldown():
-                    dx, dy = d.delta()
-                    if dx and dy:
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
+                    dist = pos.distance_squared(self.home)
+                    if dist == 13 or dist == 18:
+                        d: Direction = self.home.direction_to(pos)
+                        if dist == 17:
+                            dx, dy = d.delta()
+                            target: Position = Position(pos.x - dx * 3, pos.y - dy * 3)
+                        else:
+                            target: Position = self.home.add(d)
 
                         if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                            c.build_bridge(pos, nxt)
-                            self.index += 1
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+
+                            c.build_bridge(pos, target)
+                            self.index = len(self.path) - 1
                     else:
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
+                        dx, dy = d.delta()
+                        if dx and dy:
+                            if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                if c.can_destroy(pos):
+                                    c.destroy(pos)
 
-                        if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
-                            c.build_conveyor(pos, d)
-                            self.index += 1
+                                c.build_bridge(pos, nxt)
+                                self.index += 1
+                        else:
+                            if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
+                                if c.can_destroy(pos):
+                                    c.destroy(pos)
 
-                        if do_build:
-                            return
+                                c.build_conveyor(pos, d)
+                                self.index += 1
+
+                    if do_build:
+                        return
 
                     pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
                     d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
