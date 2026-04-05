@@ -45,8 +45,6 @@ class ConveyorManager:
             for i in range(1, len(path)):
                 c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
 
-            self.launcher_index: int = 1
-
             self.nav: Nav = nav
         else:
             self.path = []
@@ -257,73 +255,6 @@ class ConveyorManager:
                     else:
                         self.nav.move(c, cur, movement)
                     return
-
-        protected = tile_manager.protected
-        while self.launcher_index < len(self.path) - 1:
-            xi, yi = self.path[self.launcher_index]
-            if protected[yi][xi]:
-                self.launcher_index += 1
-            else:
-                break
-
-        if self.index >= self.launcher_index + 1:
-            pos = self.path[self.launcher_index]
-            dist = my_pos.distance_squared(pos)
-            if dist > 2:
-                self.nav.move(c, pos, movement)
-                my_pos = c.get_position()
-                dist = my_pos.distance_squared(pos)
-
-            if dist <= 2 and c.get_global_resources()[0] >= c.get_launcher_cost()[0] and not c.get_action_cooldown():
-                best: Position | None = None
-                mx: int = 0
-                destroy: Position | None = None
-                for d in C.DIRECTIONS:
-                    cur = pos.add(d)
-                    if U.on_the_map(cur):
-                        building_id = c.get_tile_building_id(cur)
-                        e_type = c.get_entity_type(building_id)
-                        if c.get_team(building_id) != my_team:
-                            if e_type in C.DESTROY_ENEMY:
-                                destroy = cur
-                            continue
-                        if building_id is not None and e_type not in C.CAN_BUILD_LAUNCHER:
-                            continue
-                        if c.get_tile_env(cur) != Environment.EMPTY:
-                            continue
-                        xi, yi = cur
-                        if self.path_index[yi][xi] != 1000000:
-                            continue
-                        i = self.launcher_index
-                        while i < len(self.path) - 1 and cur.distance_squared(self.path[i]) <= 2:
-                            i += 1
-                        if i > mx:
-                            best = cur
-                            mx = i
-
-                if best is None:
-                    if destroy is not None:
-                        if my_pos != destroy:
-                            self.nav.move(c, destroy, movement)
-                            my_pos = c.get_position()
-
-                        if my_pos == destroy:
-                            if c.can_fire(my_pos):
-                                c.fire(my_pos)
-                    return
-                else:
-                    if dist:
-                        self.nav.move(c, pos, movement)
-                        my_pos = c.get_position()
-
-                    if my_pos == pos and not c.get_action_cooldown() and c.get_tile_builder_bot_id(best) is None:
-                        if c.can_destroy(best):
-                            c.destroy(best)
-                        c.build_launcher(best)
-                        self.launcher_index = mx
-                    return
-            else:
-                return
 
         if self.index == len(self.path) - 1:
             # Special case where ore is adjacent to conveyor
