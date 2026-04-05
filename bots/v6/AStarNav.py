@@ -14,7 +14,7 @@ class AStarNav(Nav):
         if c.get_move_cooldown():
             return
 
-        a_star: AStarJPSOptimised = AStarJPSOptimised(self.tile_manager, 1)
+        a_star: AStarJPSOptimised = AStarJPSOptimised(self.tile_manager, 2)
         g: list[list[int]] = a_star.g
         for pos, lo, hi in self.tile_manager.bot_tracker.values():
             if hi - lo >= 2:

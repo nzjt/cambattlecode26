@@ -16,8 +16,20 @@ class ConveyorManager:
         Environment.ORE_AXIONITE
     }
 
-    def __init__(self, c: Controller, tile_manager: TileManager, start: Position, target: Position, nav: Nav):
-        a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager)
+    def __init__(self, nav: Nav):
+        self.avoid_joining: bool = True
+        self.path_index: list[list[bool]] | None = None
+        self.path = []
+        self.index = 1
+        self.done: bool = False
+        self.nav: Nav = nav
+
+    def compute(self, c: Controller, tile_manager: TileManager, start: Position, target: Position, avoid_joining: bool = True):
+        if avoid_joining:
+            a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
+        else:
+            self.avoid_joining = False
+            a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 1)
         x, y = start
         g: list[list[int]] = a_star.g
         blocked_N: bool = g[y - 1][x] == -1
@@ -37,17 +49,10 @@ class ConveyorManager:
 
         if a_star.path:
             path = self.path = U.normalise_on_grid(a_star.path, tile_manager.env_grid)
-            self.path_index: list[list[bool]] | None = None
             self.index_path(c)
 
-            self.index = 1
-            self.done: bool = False
             for i in range(1, len(path)):
                 c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
-
-            self.nav: Nav = nav
-        else:
-            self.path = []
 
     def index_path(self, c: Controller):
         path: list[Position] = self.path

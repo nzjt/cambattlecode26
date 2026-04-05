@@ -10,8 +10,11 @@ class AStarJPSOptimised:
         self.tile_manager = tile_manager
         INF = AStarJPSOptimised.INF
         if mode == 0:
-            # Conveyor nav
+            # Conveyor nav (avoid joining)
             self.g: list[list[int]] = [[INF if e == 2 else -1 for e in row] for row in self.tile_manager.env_grid]
+        elif mode == 1:
+            # Conveyor nav (avoid joining)
+            self.g: list[list[int]] = [[INF if 2 <= e <= 3 else -1 for e in row] for row in self.tile_manager.env_grid]
         else:
             # Bot nav
             self.g: list[list[int]] = [[INF if p else -1 for p in row] for row in self.tile_manager.pass_grid]
