@@ -138,7 +138,7 @@ class BuilderBot(Unit):
                         if good:
                             retargets.append(pos)
 
-            self.conveyor_manager.retarget(c, retargets, self.tile_manager)
+            # self.conveyor_manager.retarget(c, retargets, self.tile_manager)
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)

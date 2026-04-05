@@ -4,17 +4,11 @@ import utils as U
 
 
 class TileManager:
-    PASS = {
-        EntityType.CONVEYOR,
-        EntityType.SPLITTER,
-        EntityType.BRIDGE,
-        EntityType.ARMOURED_CONVEYOR
-    }
     ENV_MAP = {
         Environment.WALL: 1,
         Environment.EMPTY: 2,
-        Environment.ORE_TITANIUM: 3,
-        Environment.ORE_AXIONITE: 4
+        Environment.ORE_TITANIUM: 4,
+        Environment.ORE_AXIONITE: 5
     }
 
     def __init__(self, home: Position):
@@ -37,7 +31,6 @@ class TileManager:
         self.pass_grid: list[list[bool]] = [[True] * W for _ in range(C.H)]
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
-        self.protected: list[list[bool]] = []
         self.has_kill_chamber: bool = False
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
@@ -96,27 +89,24 @@ class TileManager:
             barrier_bitset[yi] &= clear
 
         ally, enemy = 0, 0
-        PASS = TileManager.PASS
         ROAD = EntityType.ROAD
         BARRIER = EntityType.BARRIER
         MARKER = EntityType.MARKER
         CORE = EntityType.CORE
         ENV_MAP = TileManager.ENV_MAP
-        LAUNCHER = EntityType.LAUNCHER
         GUNNER = EntityType.GUNNER
+        CONVEYOR_VARIANT = C.CONVEYOR_VARIANT
 
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
 
-        W_plus_1: int = C.W + 1
-        protected = self.protected = [[False] * W_plus_1 for _ in range(C.H)]
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
             building_id = get_tile_building_id(pos)
             env: int = ENV_MAP[get_tile_env(pos)]
             env_grid[yi][xi] = env
-            if env >= 3:
+            if env >= 4:
                 ore_bitset[yi] |= 1 << xi
             if building_id is None:
                 if env >= 2:
@@ -131,13 +121,15 @@ class TileManager:
                     pass_grid[yi][xi] = True
                     if get_team(building_id) == my_team:
                         buildable_bitset[yi] |= 1 << xi
+                elif e_type in CONVEYOR_VARIANT:
+                    pass_bitset[yi] |= 1 << xi
+                    pass_grid[yi][xi] = True
+                    if get_team(building_id) == my_team:
+                        env_grid[yi][xi] = 3
                 elif e_type == BARRIER:
                     pass_grid[yi][xi] = False
                     if get_team(building_id) == my_team:
                         barrier_bitset[yi] |= 1 << xi
-                elif e_type in PASS:
-                    pass_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = True
                 elif e_type == CORE:
                     if get_team(building_id) == my_team:
                         pass_bitset[yi] |= 1 << xi
@@ -147,11 +139,6 @@ class TileManager:
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = True
-                elif e_type == LAUNCHER:
-                    pass_grid[yi][xi] = False
-                    for yj in range(yi - 1, yi + 2):
-                        for xj in range(xi - 1, xi + 2):
-                            protected[yj][xj] = True
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = False
                     if get_team(building_id) == my_team:
@@ -176,7 +163,7 @@ class TileManager:
                     lo = round
                 bot_tracker[bb_id] = (pos, lo, round)
 
-            if env == 3:
+            if env == 4:
                 if self.ban_harvester[yi][xi]:
                     self.build_harvester[yi][xi] = False
                 elif building_id is not None:
