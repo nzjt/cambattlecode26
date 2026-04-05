@@ -250,6 +250,7 @@ class BuilderBot(Unit):
                 #     break
 
     def run(self, c: Controller):
+        super().run(c)
         my_id = c.get_id()
         my_pos = c.get_position()
         my_team = c.get_team()

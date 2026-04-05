@@ -8,6 +8,7 @@ class Gunner(Unit):
         super().__init__(c)
 
     def run(self, c: Controller):
+        super().run(c)
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
         my_team = c.get_team(my_id)

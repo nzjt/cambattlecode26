@@ -9,6 +9,7 @@ class Sentinel(Unit):
         super().__init__(c)
 
     def run(self, c: Controller):
+        super().run(c)
         if c.get_action_cooldown():
             return
 

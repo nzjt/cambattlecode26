@@ -23,6 +23,10 @@ class AStarNav(Nav):
         a_star.c = c
         a_star.compute(c.get_position(), [target])
 
+        if not a_star.path:
+            U.debug("No path!")
+            return
+
         x, y = c.get_position()
         path: list[Position] = U.normalise(a_star.path, 16)
         for i in range(1, len(path)):

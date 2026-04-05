@@ -9,6 +9,7 @@ class Launcher(Unit):
         super().__init__(c)
 
     def run(self, c: Controller):
+        super().run(c)
         my_pos = c.get_position()
         my_team = c.get_team()
 

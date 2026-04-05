@@ -123,7 +123,7 @@ class ConveyorManager:
                     if self.path_index[cur.y][cur.x] == 1000000 and e_type != Environment.WALL:
                         if e_type == Environment.ORE_TITANIUM:
                             bb_id = c.get_tile_builder_bot_id(cur)
-                            if bb_id != my_id and c.get_team(bb_id) == my_team:
+                            if bb_id is not None and bb_id != my_id and c.get_team(bb_id) == my_team:
                                 continue
 
                         building_id = c.get_tile_building_id(cur)

@@ -9,13 +9,12 @@ class Sentinel(Unit):
         super().__init__(c)
 
     def run(self, c: Controller):
+        super().run(c)
         if c.get_action_cooldown():
             return
 
         my_id = c.get_id()
-        my_pos = c.get_position(my_id)
         my_team = c.get_team(my_id)
-        W, H = c.get_map_width(), c.get_map_height()
 
         best: Position | None = None
         score = 0
@@ -27,6 +26,10 @@ class Sentinel(Unit):
                     for d in C.CARDINAL:
                         nxt = pos.add(d)
                         if U.on_the_map(nxt) and c.can_fire(nxt):
+                            bb_id = c.get_tile_builder_bot_id( nxt)
+                            if bb_id is not None and c.get_team(bb_id) == my_team:
+                                continue
+
                             building_id = c.get_tile_building_id(nxt)
                             if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
                                 if score < 7:
@@ -35,6 +38,9 @@ class Sentinel(Unit):
                                     break
             else:
                 if c.get_team(e_id) == my_team:
+                    continue
+                bb_id = c.get_tile_builder_bot_id(pos)
+                if bb_id is not None and c.get_team(bb_id) == my_team:
                     continue
 
                 if e_type == EntityType.CORE:

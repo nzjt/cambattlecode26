@@ -21,6 +21,7 @@ class TileManager:
         W: int = C.W
         H_plus_4 = C.H + 4
         self.home: Position = home
+        self.enemy_core: Position | None = None
         self.pass_bitset: list[int] = [0] * H_plus_4
         self.buildable_bitset: list[int] = [0] * H_plus_4
         self.barrier_bitset: list[int] = [0] * H_plus_4
@@ -110,6 +111,8 @@ class TileManager:
 
         W_plus_1: int = C.W + 1
         protected = self.protected = [[False] * W_plus_1 for _ in range(C.H)]
+
+        enemy_core_hash: int = 0
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
@@ -144,9 +147,12 @@ class TileManager:
                         pass_grid[yi][xi] = True
                     else:
                         pass_grid[yi][xi] = False
+                        self.enemy_core = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = True
+                    if get_team(building_id) == my_team:
+                        enemy_core_hash = c.get_marker_value(building_id)
                 elif e_type == LAUNCHER:
                     pass_grid[yi][xi] = False
                     for yj in range(yi - 1, yi + 2):
@@ -213,3 +219,6 @@ class TileManager:
         self.buildable = self.get_vision(x, y, self.buildable_bitset)
         self.ore = self.get_vision(x, y, self.ore_grid)
         self.barrier = self.get_vision(x, y, self.barrier_bitset)
+
+        if enemy_core_hash:
+            self.enemy_core = Position(enemy_core_hash >> 6, enemy_core_hash & 63)

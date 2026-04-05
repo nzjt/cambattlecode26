@@ -9,6 +9,7 @@ class Core(Unit):
         self.has_tried_foundry: bool = False
 
     def run(self, c: Controller):
+        super().run(c)
         if c.get_current_round() == 100:
             c.resign()
         my_pos = c.get_position(c.get_id())
