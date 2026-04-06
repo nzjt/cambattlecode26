@@ -347,10 +347,16 @@ class ConveyorManager:
             cur: Position = pos
             for _ in range(3 if di in C.CARDINAL else 2):
                 cur = cur.add(di)
-                if U.on_the_map(cur) and c.get_tile_env(cur) != Environment.WALL:
-                    building_id = c.get_tile_building_id(cur)
-                    if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
-                        keep_gunner = c.get_team(building_id) != my_team
+                if U.on_the_map(cur):
+                    if c.is_in_vision(cur):
+                        if c.get_tile_env(cur) != Environment.WALL:
+                            building_id = c.get_tile_building_id(cur)
+                            if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                                keep_gunner = c.get_team(building_id) != my_team
+                                break
+                        else:
+                            break
+                    else:
                         break
                 else:
                     break
@@ -401,9 +407,9 @@ class ConveyorManager:
             if need_gunner:
                 if c.get_global_resources()[0] >= c.get_gunner_cost()[0]:
                     pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
-                    d: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-                    if d is not None and d != Direction.CENTRE:
-                        movement.move(d)
+                    e: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
+                    if e is not None and e != Direction.CENTRE:
+                        movement.move(e)
 
                     if c.can_destroy(pos):
                         c.destroy(pos)
@@ -471,7 +477,7 @@ class ConveyorManager:
 
                     if d is not None and d != Direction.CENTRE:
                         movement.move(d)
-        else:
+        elif not c.get_move_cooldown():
             if do_build:
                 return
 

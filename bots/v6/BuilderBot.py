@@ -1,11 +1,8 @@
 import random
-from lib2to3.pgen2.literals import simple_escapes
-
 from cambc import *
 from Unit import Unit
 from Movement import Movement
 from Nav import Nav
-from Bug0Better import Bug0Better
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
@@ -217,11 +214,22 @@ class BuilderBot(Unit):
                         self.ores.discard(pos)
 
                 building_id = c.get_tile_building_id(pos)
-                if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
+                e_type = c.get_entity_type(building_id)
+                if e_type in C.CONVEYOR_VARIANT:
                     if c.get_team(building_id) == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             self.target = pos
                             self.target_type = 9
+                            break
+
+                        if e_type in C.CONVEYOR:
+                            nxt = pos.add(c.get_direction(building_id))
+                            if U.is_visible(nxt):
+                                building_id = c.get_tile_building_id(nxt)
+                                if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
+                                    self.target = pos
+                                    self.sub_target = nxt
+                                    self.target_type = 7
                 # if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
                 #     # Need to repair!
                 #     print("rep", pos)
@@ -311,12 +319,13 @@ class BuilderBot(Unit):
                     heal_core = True
                     if d != Direction.CENTRE and self.movement.can_move(d):
                         self.movement.move(d)
-
-        if ((c.get_hp(my_id) < c.get_max_hp(my_id) and self.target_type != 4) or heal_core) and c.can_heal(my_pos):
-            c.heal(my_pos)
-            self.movement.act(c)
+                        my_pos = c.get_position()
 
         if heal_core:
+            target = self.home.add(self.home.direction_to(my_pos))
+            if c.can_heal(target):
+                c.heal(target)
+
             return
 
         if self.target_type == 0:
@@ -324,12 +333,15 @@ class BuilderBot(Unit):
                 self.target_type = 1
                 self.target = self.home
             else:
-                for _ in range(10):
-                    self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-                    if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
-                        self.target_type = 1
-                        self.expiry = c.get_current_round() + 260
-                        break
+                if not self.is_healer and self.ores:
+                    self.target_type = 2
+                else:
+                    for _ in range(10):
+                        self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
+                        if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
+                            self.target_type = 1
+                            self.expiry = c.get_current_round() + 260
+                            break
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
@@ -439,6 +451,28 @@ class BuilderBot(Unit):
 
             if self.foundry_manager.check_foundry(c) or c.get_current_round() >= self.foundry_manager.expiry and self.foundry_manager.target is None:
                 self.target_type = 0
+        elif self.target_type == 7:
+            c.draw_indicator_line(my_pos, self.target, 128, 255, 0)
+            dist = my_pos.distance_squared(self.target)
+            if not dist:
+                if not c.get_action_cooldown():
+                    for d in C.DIRECTIONS:
+                        if c.can_move(d):
+                            self.movement.move(d)
+                            my_pos = c.get_position()
+                            dist = my_pos.distance_squared(my_pos)
+                            break
+
+            if 1 <= dist <= 2:
+                if c.can_destroy(self.target):
+                    c.destroy(self.target)
+                d: Direction = self.target.direction_to(self.sub_target)
+                if c.can_build_gunner(self.target, d):
+                    c.build_gunner(self.target, d)
+                    self.target_type = 0
+
+            if self.target_type and dist:
+                self.nav.move(c, self.target, self.movement)
         elif self.target_type == 9:
             if c.is_in_vision(self.target):
                 building_id = c.get_tile_building_id(self.target)
@@ -452,6 +486,11 @@ class BuilderBot(Unit):
                         c.heal(self.target)
             else:
                 self.nav.move(c, self.target, self.movement)
+
+        if c.get_hp() < c.get_max_hp() and self.target_type != 4 and c.can_heal(my_pos):
+            c.heal(my_pos)
+            self.movement.act(c)
+
         if self.target_type != 3:
             my_pos = c.get_position()
             if not c.get_move_cooldown():

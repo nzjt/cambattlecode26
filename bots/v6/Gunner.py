@@ -1,6 +1,6 @@
 from cambc import *
 from Unit import Unit
-from consts import UNIMPORTANT
+import consts as C
 
 
 class Gunner(Unit):
@@ -9,6 +9,10 @@ class Gunner(Unit):
 
     def run(self, c: Controller):
         super().run(c)
+
+        if c.get_action_cooldown():
+            return
+
         my_id = c.get_id()
         my_pos = c.get_position(my_id)
         my_team = c.get_team(my_id)
@@ -18,18 +22,47 @@ class Gunner(Unit):
         for _ in range(3):
             target = target.add(d)
             if c.can_fire(target):
+                bb_id = c.get_tile_builder_bot_id(target)
+                if bb_id is not None:
+                    if c.get_team(bb_id) == my_team:
+                        break
+                    else:
+                        c.fire(target)
+                        return
+
                 building_id = c.get_tile_building_id(target)
                 if building_id is not None and c.get_team(building_id) == my_team:
-                    if c.get_entity_type(building_id) in UNIMPORTANT:
-                        bb_id = c.get_tile_builder_bot_id(target)
-                        if c.get_team(bb_id) == my_team:
-                            break
-                    else:
-                        break
-
-                bb_id = c.get_tile_builder_bot_id(target)
-                if bb_id is not None and c.get_team(bb_id) == my_team:
                     break
 
                 c.fire(target)
                 break
+            else:
+                break
+
+        if c.get_action_cooldown():
+            return
+
+        target = my_pos
+        useful: bool = False
+        for _ in range(3 if d in C.CARDINAL else 2):
+            target = target.add(d)
+            building_id = c.get_tile_building_id(target)
+            if building_id is not None:
+                if c.get_team(building_id) == my_team:
+                    break
+                else:
+                    useful = True
+                    break
+
+        if not useful:
+            for d in C.DIRECTIONS:
+                target = my_pos
+                for _ in range(3 if d in C.CARDINAL else 2):
+                    target = target.add(d)
+                    building_id = c.get_tile_building_id(target)
+                    if building_id is not None:
+                        if c.get_team(building_id) == my_team:
+                            break
+                        elif c.get_entity_type(building_id) not in C.UNIMPORTANT:
+                            c.rotate(d)
+                            return
