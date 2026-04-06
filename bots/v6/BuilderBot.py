@@ -10,30 +10,37 @@ from FoundryManager import FoundryManager
 from AStarNav import AStarNav
 import consts as C
 import utils as U
+from Wander import Wander
 
 
 class BuilderBot(Unit):
     def __init__(self, c: Controller):
         super().__init__(c)
-        self.birth: int = 0
-        self.movement: Movement | None = None
-        self.tile_manager: TileManager | None = None
-        self.nav: Nav | None = None
-        self.home: Position | None = None
+        self.birth = c.get_current_round()
+        self.home = c.get_position(c.get_tile_building_id(c.get_position()))
+        self.tile_manager = TileManager(self.home)
+        self.bfs = Bfs(self.home, self.tile_manager)
+        self.nav = AStarNav(self.tile_manager, self.bfs)
+        self.prev_resources = c.get_global_resources()[0]
+        self.is_healer = self.birth >= 4
+        self.movement: Movement = Movement()
+        self.wander: Wander = Wander(self.nav, self.movement)
         self.target: Position | None = None
         self.sub_target: Position | None = None
         self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors, 5: repair conveyor
         self.target_dist: int = 0
         self.conveyor_manager: ConveyorManager | None = None
         self.expiry: int = 0
-        self.bfs: Bfs | None = None
         self.foundry_manager: FoundryManager | None = None
         self.is_troll: bool = False
         self.has_econ: bool = False
-        self.prev_resources: int = 1000
         self.has_harvester: bool = False
         self.ores: set[Position] = set()
-        self.is_healer: bool = False
+
+        # if self.birth >= 100:
+        #     if not FoundryManager.check_foundry(c):
+        #         self.foundry_manager = FoundryManager(self.home, self.birth + 25)
+        #         self.target_type = 6
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -264,24 +271,8 @@ class BuilderBot(Unit):
 
     def run(self, c: Controller):
         super().run(c)
-        my_id = c.get_id()
         my_pos = c.get_position()
         my_team = c.get_team()
-
-        if self.home is None:
-            self.birth = c.get_current_round()
-            self.home = c.get_position(c.get_tile_building_id(my_pos))
-            self.movement = Movement()
-            self.tile_manager = TileManager(self.home)
-            self.bfs = Bfs(self.home, self.tile_manager)
-            self.nav = AStarNav(self.tile_manager, self.bfs)
-            self.prev_resources = c.get_global_resources()[0]
-            self.is_healer = self.birth >= 4
-
-            # if self.birth >= 100:
-            #     if not FoundryManager.check_foundry(c):
-            #         self.foundry_manager = FoundryManager(self.home, self.birth + 25)
-            #         self.target_type = 6
 
         # self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
 
@@ -292,7 +283,7 @@ class BuilderBot(Unit):
             if self.conveyor_manager.done:
                 self.target_type = 0
 
-        self.tile_manager.sense(c, self.home)
+        self.tile_manager.sense(c, self.home, self.wander)
         self.bfs.update(c, self.conveyor_manager)
 
         self.sense(c)
@@ -329,21 +320,17 @@ class BuilderBot(Unit):
             return
 
         if self.target_type == 0:
-            if self.is_healer and self.home.distance_squared(my_pos) > 30:
-                self.target_type = 1
-                self.target = self.home
-            else:
-                if not self.is_healer and self.ores:
-                    self.target_type = 2
-                else:
-                    for _ in range(10):
-                        self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-                        if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
-                            self.target_type = 1
-                            self.expiry = c.get_current_round() + 260
-                            break
+            if not self.is_healer:
+                for _ in range(10):
+                    self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
+                    if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
+                        self.target_type = 1
+                        self.expiry = c.get_current_round() + 260
+                        break
 
-        if self.target_type == 1:
+        if self.target_type == 0:
+            self.wander.update(c)
+        elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 2:

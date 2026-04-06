@@ -1,6 +1,7 @@
 from cambc import *
 import consts as C
 import utils as U
+from Wander import Wander
 
 
 class TileManager:
@@ -58,7 +59,7 @@ class TileManager:
                     (grid[y + 3] << shift & only_9) << 70 |
                     (grid[y + 4] << shift & only_9) << 80)
 
-    def sense(self, c: Controller, home: Position):
+    def sense(self, c: Controller, home: Position, wander: Wander):
         get_tile_building_id = c.get_tile_building_id
         get_tile_env = c.get_tile_env
         get_entity_type = c.get_entity_type
@@ -100,6 +101,9 @@ class TileManager:
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
 
+        wander_seen = wander.seen
+        wander_unseen = wander.unseen
+
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
@@ -126,6 +130,11 @@ class TileManager:
                     pass_grid[yi][xi] = 2
                     if get_team(building_id) == my_team:
                         env_grid[yi][xi] = 3
+                        if my_pos.distance_squared(pos) <= 10:
+                            wander_seen.add(pos)
+                            wander_unseen.discard(pos)
+                        elif pos not in wander.seen:
+                            wander.unseen.add(pos)
                 elif e_type == BARRIER:
                     pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:

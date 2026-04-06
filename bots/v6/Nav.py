@@ -6,5 +6,5 @@ class Nav:
     def move(self, c: Controller, target: Position, movement: Movement) -> None:
         pass
 
-    def multimove(self, c: Controller, targets: list[Position], movement: Movement) -> None:
+    def multimove(self, c: Controller, targets: list[Position], movement: Movement, active: bool = False) -> None:
         pass

@@ -15,11 +15,11 @@ class AStarNav(Nav):
     def move(self, c: Controller, target: Position, movement: Movement) -> None:
         self.multimove(c, [target], movement)
 
-    def multimove(self, c: Controller, targets: list[Position], movement: Movement) -> None:
+    def multimove(self, c: Controller, targets: list[Position], movement: Movement, active: bool = False) -> None:
         if c.get_move_cooldown():
             return
 
-        a_star: AStarJPSOptimised = AStarJPSOptimised(self.tile_manager, 2)
+        a_star: AStarJPSOptimised = AStarJPSOptimised(self.tile_manager, 3 if active and not movement.is_rich else 2)
         g: list[list[int]] = a_star.g
         for pos, lo, hi in self.tile_manager.bot_tracker.values():
             if hi - lo >= 2:
