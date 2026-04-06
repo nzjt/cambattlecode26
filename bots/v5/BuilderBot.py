@@ -246,17 +246,18 @@ class BuilderBot(Unit):
 
         building_id = c.get_tile_building_id(my_pos)
         if c.get_team(building_id) != my_team and c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
-            if c.can_fire(my_pos):
-                c.fire(my_pos)
-                self.movement.act(c)
+            if c.get_hp(building_id) < c.get_max_hp(building_id) or not self.tile_manager.enemy:
+                if c.can_fire(my_pos):
+                    c.fire(my_pos)
+                    self.movement.act(c)
 
-            if self.target_type == 4:
-                building_id = c.get_tile_building_id(my_pos)
-                if building_id is not None:
-                    health: int = c.get_hp(building_id)
-                    if health <= self.target_health:
-                        self.target = my_pos
-                        self.target_health = health
+                if self.target_type == 4:
+                    building_id = c.get_tile_building_id(my_pos)
+                    if building_id is not None:
+                        health: int = c.get_hp(building_id)
+                        if health <= self.target_health:
+                            self.target = my_pos
+                            self.target_health = health
 
         if self.target_type == 0:
             for _ in range(10):
@@ -339,14 +340,14 @@ class BuilderBot(Unit):
                     my_pos = c.get_position()
 
                 building_id = c.get_tile_building_id(my_pos)
-                if c.get_team(building_id) != my_team and c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
-                    if c.can_fire(my_pos):
-                        c.fire(my_pos)
+                if c.get_hp(building_id) < c.get_max_hp(building_id) or not self.tile_manager.enemy:
+                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
+                        if c.can_fire(my_pos):
+                            c.fire(my_pos)
 
             dist = my_pos.distance_squared(self.target)
             self.target_dist = min(self.target_dist, dist)
         elif self.target_type == 5:
-            print(c.get_sentinel_cost())
             dist = my_pos.distance_squared(self.target)
             if not dist:
                 if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_sentinel_cost()[0]:

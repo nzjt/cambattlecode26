@@ -39,7 +39,7 @@ class Core(Unit):
         #             c.spawn_builder(pos)
         #             break
         elif c.get_current_round() >= 100:
-            if c.get_global_resources()[0] >= 800:
+            if c.get_global_resources()[0] >= c.get_sentinel_cost()[0] + 10:
                 for d in Direction:
                     pos = my_pos.add(d)
                     if c.can_spawn(pos):
