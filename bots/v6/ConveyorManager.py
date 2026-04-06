@@ -136,8 +136,14 @@ class ConveyorManager:
                 self.index_path(c)
 
     def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs, repair: bool = False):
-        my_id = c.get_id()
         my_team = c.get_team()
+        if c.is_in_vision(self.path[0]):
+            building_id = c.get_tile_building_id(self.path[0])
+            if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
+                self.done = True
+                return
+
+        my_id = c.get_id()
         my_pos = c.get_position(my_id)
         on_ore: bool = not repair and my_pos == self.path[0]
         enemy_near: bool = False

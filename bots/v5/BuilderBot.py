@@ -357,7 +357,11 @@ class BuilderBot(Unit):
 
                             if c.can_destroy(self.target):
                                 c.destroy(self.target)
-                            c.build_sentinel(self.target, self.target.direction_to(self.tile_manager.enemy_core))
+                            if self.tile_manager.enemy_core is None:
+                                d: Direction = self.target.direction_to(self.home).opposite()
+                            else:
+                                d: Direction = self.target.direction_to(self.tile_manager.enemy_core)
+                            c.build_sentinel(self.target, d)
                             self.target_type = 0
                             break
 
@@ -368,7 +372,10 @@ class BuilderBot(Unit):
                 if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_sentinel_cost()[0]:
                     if c.can_destroy(self.target):
                         c.destroy(self.target)
-                    d: Direction = self.target.direction_to(self.tile_manager.enemy_core)
+                    if self.tile_manager.enemy_core is None:
+                        d: Direction = self.target.direction_to(self.home).opposite()
+                    else:
+                        d: Direction = self.target.direction_to(self.tile_manager.enemy_core)
                     if c.can_build_sentinel(self.target, d):
                         c.build_sentinel(self.target, d)
                         self.target_type = 0

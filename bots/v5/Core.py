@@ -10,8 +10,6 @@ class Core(Unit):
 
     def run(self, c: Controller):
         super().run(c)
-        if c.get_current_round() == 100:
-            c.resign()
         my_pos = c.get_position(c.get_id())
 
         for building_id in c.get_nearby_buildings(5):
