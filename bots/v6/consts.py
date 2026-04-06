@@ -75,5 +75,15 @@ CHAMBER_WALL = {
     EntityType.BARRIER,
     EntityType.LAUNCHER
 }
+DIRECTION_MAP = {
+    (0, -1): Direction.NORTH,
+    (1, -1): Direction.NORTHEAST,
+    (1, 0): Direction.EAST,
+    (1, 1): Direction.SOUTHEAST,
+    (0, 1): Direction.SOUTH,
+    (-1, 1): Direction.SOUTHWEST,
+    (-1, 0): Direction.WEST,
+    (-1, -1): Direction.NORTHWEST,
+}
 W: int = 0
 H: int = 0

@@ -50,8 +50,8 @@ class Player:
                     f"\033[1;33mCaused by bot {c.get_id()} at {c.get_position()}, round {c.get_current_round() - 1}\033[0m",
                     file=sys.stderr
                 )
-                # c.resign()
-                c.self_destruct()
+                c.resign()
+                # c.self_destruct()
         except Exception:
             print("Uncaught exception??")
             print(traceback.format_exc())

@@ -25,36 +25,20 @@ class ConveyorManager:
         self.nav: Nav = nav
         self.home: Position = home
 
-    def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
+    def compute(self, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
         if avoid_joining:
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
             g: list[list[int]] = a_star.g
             x, y = self.home
             env_grid = tile_manager.env_grid
-            if env_grid[y - 2][x + 1] == 3:
-                g[y - 2][x + 1] = 1000000
             if env_grid[y - 2][x + 2] == 3:
                 g[y - 2][x + 2] = 1000000
-            if env_grid[y - 1][x + 2] == 3:
-                g[y - 1][x + 2] = 1000000
-            if env_grid[y + 2][x + 1] == 3:
-                g[y + 2][x + 1] = 1000000
             if env_grid[y + 2][x + 2] == 3:
                 g[y + 2][x + 2] = 1000000
-            if env_grid[y + 1][x + 2] == 3:
-                g[y + 1][x + 2] = 1000000
-            if env_grid[y - 2][x-+ 1] == 3:
-                g[y - 2][x - 1] = 1000000
             if env_grid[y - 2][x - 2] == 3:
                 g[y - 2][x - 2] = 1000000
-            if env_grid[y - 1][x - 2] == 3:
-                g[y - 1][x - 2] = 1000000
-            if env_grid[y + 2][x - 1] == 3:
-                g[y + 2][x - 1] = 1000000
             if env_grid[y + 2][x - 2] == 3:
                 g[y + 2][x - 2] = 1000000
-            if env_grid[y + 1][x - 2] == 3:
-                g[y + 1][x - 2] = 1000000
         else:
             self.avoid_joining = False
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 1)
@@ -74,9 +58,13 @@ class ConveyorManager:
             g[y - 1][x - 1] = -1
 
         a_star.compute(start, [self.home], True)
+        return a_star.path
 
-        if a_star.path:
-            path = self.path = U.normalise_on_grid(a_star.path, tile_manager.env_grid)
+    def generate_path(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
+        path = self.compute(tile_manager, start, avoid_joining)
+
+        if path:
+            path = self.path = U.normalise_on_grid(path, tile_manager.env_grid)
             self.index_path(c)
 
             for i in range(1, len(path)):
@@ -90,49 +78,61 @@ class ConveyorManager:
             x, y = path[i]
             path_index[y][x] = i
 
-    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager):
-        x, y = c.get_position()
-        lo, hi = self.index, self.index
-        xi, yi = self.path[hi]
-        dx, dy = xi - x, yi - y
-        if -4 <= dx <= 4 and -4 <= dy <= 4:
-            goal: int = 1 << (dx + dy * 10 + 44)
-        else:
-            # ???
-            return
-
-        while lo > 1:
-            xi, yi = self.path[lo - 1]
-            dx, dy = xi - x, yi - y
-            if -4 <= dx <= 4 and -4 <= dy <= 4:
-                goal |= 1 << (dx + dy * 10 + 44)
-                lo -= 1
+    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager, reroute: bool = False):
+        if self.avoid_joining and reroute:
+            path = self.compute(tile_manager, self.path[self.index])
+            if path:
+                self.path = self.path[:self.index] + U.normalise_on_grid(path, tile_manager.env_grid)
+                self.index_path(c)
+                for i in range(1, len(path)):
+                    c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+                return
             else:
-                break
+                self.avoid_joining = False
 
-        retarget_set: int = 0
-        for xi, yi in retargets:
+        if not self.avoid_joining:
+            x, y = c.get_position()
+            lo, hi = self.index, self.index
+            xi, yi = self.path[hi]
             dx, dy = xi - x, yi - y
             if -4 <= dx <= 4 and -4 <= dy <= 4:
-                retarget_set |= 1 << (dx + dy * 10 + 44)
+                goal: int = 1 << (dx + dy * 10 + 44)
+            else:
+                # ???
+                return
 
-        raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, (tile_manager.pass_ | tile_manager.buildable | tile_manager.barrier) & ~tile_manager.ore)
-        if not raw_path:
-            return
+            while lo > 1:
+                xi, yi = self.path[lo - 1]
+                dx, dy = xi - x, yi - y
+                if -4 <= dx <= 4 and -4 <= dy <= 4:
+                    goal |= 1 << (dx + dy * 10 + 44)
+                    lo -= 1
+                else:
+                    break
 
-        suffix: list[Position] = [Position(x + dx, y + dy) for dx, dy in raw_path]
-        suffix = U.normalise_on_grid(suffix, tile_manager.env_grid)
-        if len(suffix) < len(self.path) - self.index:
-            while self.path[self.index] != suffix[0]:
-                self.index -= 1
-            self.path = self.path[:self.index]
+            retarget_set: int = 0
+            for xi, yi in retargets:
+                dx, dy = xi - x, yi - y
+                if -4 <= dx <= 4 and -4 <= dy <= 4:
+                    retarget_set |= 1 << (dx + dy * 10 + 44)
 
-            self.path += suffix
+            raw_path: list[tuple[int, int]] = Bfs.closest_start(goal, retarget_set, (tile_manager.pass_ | tile_manager.buildable | tile_manager.barrier) & ~tile_manager.ore)
+            if not raw_path:
+                return
 
-            for i in range(1, len(self.path)):
-                c.draw_indicator_line(self.path[i - 1], self.path[i], 255, 255, 0)
+            suffix: list[Position] = [Position(x + dx, y + dy) for dx, dy in raw_path]
+            suffix = U.normalise_on_grid(suffix, tile_manager.env_grid)
+            if len(suffix) < len(self.path) - self.index:
+                while self.path[self.index] != suffix[0]:
+                    self.index -= 1
+                self.path = self.path[:self.index]
 
-            self.index_path(c)
+                self.path += suffix
+
+                for i in range(1, len(self.path)):
+                    c.draw_indicator_line(self.path[i - 1], self.path[i], 255, 255, 0)
+
+                self.index_path(c)
 
     def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs, repair: bool = False):
         my_id = c.get_id()
@@ -422,14 +422,31 @@ class ConveyorManager:
                             self.index = len(self.path) - 1
                     else:
                         dx, dy = d.delta()
-                        if dx and dy:
-                            if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                if c.can_destroy(pos):
-                                    c.destroy(pos)
 
-                                c.build_bridge(pos, nxt)
-                                self.index += 1
-                        else:
+                        def is_clear(cur: Position):
+                            if c.get_tile_env(cur) == Environment.EMPTY:
+                                building_id = c.get_tile_building_id(cur)
+                                if building_id is None or c.get_entity_type(building_id) not in C.UNIMPORTANT:
+                                    self.path.insert(self.index + 1, cur)
+                                    return True
+                            return False
+
+                        if dx and dy:
+                            if is_clear(Position(pos.x + dx, pos.y)):
+                                dy = 0
+                                d = C.DIRECTION_MAP[(dx, 0)]
+                            elif is_clear(Position(pos.x, pos.y + dy)):
+                                dx = 0
+                                d = C.DIRECTION_MAP[(0, dy)]
+                            else:
+                                if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                    if c.can_destroy(pos):
+                                        c.destroy(pos)
+
+                                    c.build_bridge(pos, nxt)
+                                    self.index += 1
+
+                        if not dx or not dy:
                             if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
                                 if c.can_destroy(pos):
                                     c.destroy(pos)

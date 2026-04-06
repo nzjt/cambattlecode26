@@ -69,7 +69,22 @@ class BuilderBot(Unit):
             else:
                 return trustworthy
 
-        if self.target_type == 4:
+        if self.target_type == 2:
+            rem: list[Position] = []
+            for target in self.ores:
+                if c.is_in_vision(target):
+                    for d in Direction:
+                        pos = target.add(d)
+                        if U.is_visible(pos):
+                            bb_id = c.get_tile_builder_bot_id(pos)
+                            if bb_id is not None and c.get_team(bb_id) == my_team:
+                                rem.append(target)
+                                break
+            for pos in rem:
+                self.ores.remove(pos)
+            if not self.ores:
+                self.target_type = 0
+        elif self.target_type == 4:
             dist = my_pos.distance_squared(self.target)
             xi, yi = self.target
             if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
@@ -99,6 +114,20 @@ class BuilderBot(Unit):
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
 
+        if self.target_type == 2:
+            if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
+                self.target_type = 0
+
+            if self.target_type:
+                dist = my_pos.distance_squared(self.target)
+                self.target_dist = min(self.target_dist, dist)
+
+                if not self.is_troll:
+                    if dist <= 2:
+                        self.conveyor_manager = ConveyorManager(self.nav, self.home)
+                        self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
+                        self.target_type = 3
+
         if self.target_type == 6:
             pass
         elif self.target_type == 5:
@@ -106,13 +135,17 @@ class BuilderBot(Unit):
         elif self.target_type == 4:
             pass
         elif self.target_type == 3:
-            if self.conveyor_manager.path and not self.conveyor_manager.avoid_joining:
+            if self.conveyor_manager.path:
                 retargets: list[Position] = []
+                reroute: bool = False
+                path_index = self.conveyor_manager.path_index
                 for pos in c.get_nearby_tiles():
                     building_id = c.get_tile_building_id(pos)
                     if c.get_entity_type(building_id) in C.MONOCHILD_CONVEYOR and c.get_team(building_id) == my_team:
                         xi, yi = pos
-                        if self.conveyor_manager.path_index[yi][xi] >= self.conveyor_manager.index:
+                        cur_index = path_index[yi][xi]
+                        if cur_index >= self.conveyor_manager.index:
+                            reroute |= cur_index < 1000000
                             good = True
                             cur = pos
                             for _ in range(10):
@@ -140,7 +173,7 @@ class BuilderBot(Unit):
                             if good:
                                 retargets.append(pos)
 
-                self.conveyor_manager.retarget(c, retargets, self.tile_manager)
+                self.conveyor_manager.retarget(c, retargets, self.tile_manager, reroute)
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
@@ -264,20 +297,6 @@ class BuilderBot(Unit):
         self.tile_manager.sense(c, self.home)
         self.bfs.update(c, self.conveyor_manager)
 
-        if self.target_type == 2:
-            if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
-                self.target_type = 0
-
-            if self.target_type:
-                dist = my_pos.distance_squared(self.target)
-                self.target_dist = min(self.target_dist, dist)
-
-                if not self.is_troll:
-                    if dist <= 2:
-                        self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                        self.conveyor_manager.compute(c, self.tile_manager, self.target)
-                        self.target_type = 3
-
         self.sense(c)
         self.movement.upd(c)
 
@@ -353,7 +372,7 @@ class BuilderBot(Unit):
         elif self.target_type == 3:
             if not self.conveyor_manager.path:
                 if c.get_cpu_time_elapsed() <= 600:
-                    self.conveyor_manager.compute(c, self.tile_manager, self.target, False)
+                    self.conveyor_manager.generate_path(c, self.tile_manager, self.target, False)
                     if not self.conveyor_manager.path:
                         self.tile_manager.ban_harvester[self.target.y][self.target.x] = True
                         self.target_type = 0
@@ -410,7 +429,7 @@ class BuilderBot(Unit):
             if self.conveyor_manager is None:
                 if my_pos.distance_squared(self.target) <= 2:
                     self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                    self.conveyor_manager.compute(c, self.tile_manager, self.target)
+                    self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
                     self.conveyor_manager.index -= 1
                 else:
                     self.nav.move(c, self.target, self.movement)

@@ -70,3 +70,4 @@ def normalise(waypoints: list[Position], max_len: int = -1):
 
 on_the_map = None
 debug = None
+is_visible = None
