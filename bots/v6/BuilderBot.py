@@ -69,22 +69,7 @@ class BuilderBot(Unit):
             else:
                 return trustworthy
 
-        if self.target_type == 2:
-            rem: list[Position] = []
-            for target in self.ores:
-                if c.is_in_vision(target):
-                    for d in Direction:
-                        pos = target.add(d)
-                        if U.is_visible(pos):
-                            bb_id = c.get_tile_builder_bot_id(pos)
-                            if bb_id is not None and c.get_team(bb_id) == my_team:
-                                rem.append(target)
-                                break
-            for pos in rem:
-                self.ores.remove(pos)
-            if not self.ores:
-                self.target_type = 0
-        elif self.target_type == 4:
+        if self.target_type == 4:
             dist = my_pos.distance_squared(self.target)
             xi, yi = self.target
             if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
@@ -114,19 +99,21 @@ class BuilderBot(Unit):
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
 
-        if self.target_type == 2:
-            if not self.tile_manager.build_harvester[self.target.y][self.target.x]:
-                self.target_type = 0
-
-            if self.target_type:
-                dist = my_pos.distance_squared(self.target)
-                self.target_dist = min(self.target_dist, dist)
-
-                if not self.is_troll:
-                    if dist <= 2:
+        if self.target_type <= 2:
+            for pos in c.get_nearby_tiles(2):
+                if c.get_tile_env(pos) == Environment.ORE_TITANIUM and self.tile_manager.build_harvester[pos.y][pos.x]:
+                    for d in Direction:
+                        cur = pos.add(d)
+                        if U.is_visible(cur):
+                            bb_id = c.get_tile_builder_bot_id(cur)
+                            if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
+                                break
+                    else:
+                        self.target = pos
                         self.conveyor_manager = ConveyorManager(self.nav, self.home)
                         self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
                         self.target_type = 3
+                        break
 
         if self.target_type == 6:
             pass
@@ -145,6 +132,8 @@ class BuilderBot(Unit):
                         xi, yi = pos
                         cur_index = path_index[yi][xi]
                         if cur_index >= self.conveyor_manager.index:
+                            if cur_index == self.conveyor_manager.index:
+                                self.conveyor_manager.avoid_joining = False
                             reroute |= cur_index < 1000000
                             good = True
                             cur = pos
@@ -240,6 +229,30 @@ class BuilderBot(Unit):
                 #     self.conveyor_manager = None
                 #     break
 
+            if self.target_type == 2:
+                rem: list[Position] = []
+                for target in self.ores:
+                    if c.is_in_vision(target):
+                        for d in Direction:
+                            pos = target.add(d)
+                            if U.is_visible(pos):
+                                bb_id = c.get_tile_builder_bot_id(pos)
+                                if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
+                                    rem.append(target)
+                                    break
+                for pos in rem:
+                    self.ores.remove(pos)
+                if self.ores:
+                    closest_dist: int = 10000
+                    self.target = None
+                    for pos in self.ores:
+                        dist = my_pos.distance_squared(pos)
+                        if dist < closest_dist:
+                            closest_dist = dist
+                            self.target = pos
+                else:
+                    self.target_type = 0
+
     def run(self, c: Controller):
         super().run(c)
         my_id = c.get_id()
@@ -265,31 +278,6 @@ class BuilderBot(Unit):
         if self.target_type == 1:
             if my_pos.distance_squared(self.target) <= 4 or c.get_current_round() > self.expiry:
                 self.target_type = 0
-        elif self.target_type == 2:
-            if self.ores:
-                closest_dist: int = 10000
-                self.target = None
-                for pos in self.ores:
-                    dist = my_pos.distance_squared(pos)
-                    if dist < closest_dist:
-                        closest_dist = dist
-                        self.target = pos
-            else:
-                self.target_type = 0
-            # if c.is_in_vision(self.target):
-            #     bb_id = c.get_tile_builder_bot_id(self.target)
-            #     if bb_id is not None and bb_id != my_id:
-            #         self.target_type = 0
-            #     else:
-            #         if self.is_troll:
-            #             building_id = c.get_tile_building_id(self.target)
-            #             e_type = c.get_entity_type(building_id)
-            #             if c.get_team(building_id) == my_team:
-            #                 if e_type == EntityType.BARRIER or e_type == EntityType.HARVESTER:
-            #                     self.target_type = 0
-            #             else:
-            #                 if e_type not in C.DESTROY_ENEMY:
-            #                     self.target_type = 0
         elif self.target_type == 3:
             if self.conveyor_manager.done:
                 self.target_type = 0
