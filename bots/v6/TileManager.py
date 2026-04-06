@@ -28,7 +28,7 @@ class TileManager:
         self.build_harvester = [[True] * W for _ in range(C.H)]
         self.ban_harvester = [[False] * W for _ in range(C.H)]
         self.env_grid = [[0] * W for _ in range(C.H)]
-        self.pass_grid: list[list[bool]] = [[True] * W for _ in range(C.H)]
+        self.pass_grid: list[list[int]] = [[1] * W for _ in range(C.H)]
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.has_kill_chamber: bool = False
@@ -111,42 +111,42 @@ class TileManager:
             if building_id is None:
                 if env >= 2:
                     buildable_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = True
+                    pass_grid[yi][xi] = 1
                 else:
-                    pass_grid[yi][xi] = False
+                    pass_grid[yi][xi] = 0
             else:
                 e_type = get_entity_type(building_id)
                 if e_type == ROAD:
                     pass_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = True
+                    pass_grid[yi][xi] = 2
                     if get_team(building_id) == my_team:
                         buildable_bitset[yi] |= 1 << xi
                 elif e_type in CONVEYOR_VARIANT:
                     pass_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = True
+                    pass_grid[yi][xi] = 2
                     if get_team(building_id) == my_team:
                         env_grid[yi][xi] = 3
                 elif e_type == BARRIER:
-                    pass_grid[yi][xi] = False
+                    pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:
                         barrier_bitset[yi] |= 1 << xi
                 elif e_type == CORE:
                     if get_team(building_id) == my_team:
                         pass_bitset[yi] |= 1 << xi
-                        pass_grid[yi][xi] = True
+                        pass_grid[yi][xi] = 2
                     else:
-                        pass_grid[yi][xi] = False
+                        pass_grid[yi][xi] = 0
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = True
+                    pass_grid[yi][xi] = 1
                 elif e_type == GUNNER:
-                    pass_grid[yi][xi] = False
+                    pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
                 else:
-                    pass_grid[yi][xi] = False
+                    pass_grid[yi][xi] = 0
 
             bb_id = get_tile_builder_bot_id(pos)
             if bb_id is not None:

@@ -3,6 +3,8 @@ from TileManager import TileManager
 from AStarJPSOptimised import AStarJPSOptimised
 import utils as U
 from Bfs import Bfs
+import consts as C
+import random
 
 
 class AStarNav(Nav):
@@ -43,10 +45,22 @@ class AStarNav(Nav):
             if movement.is_rich:
                 d: Direction = self.bfs.bfs_along_path(prefix, (self.tile_manager.pass_ | self.tile_manager.buildable) & unitless)
 
-                if d is None:
-                    # Cannot :(
+            if d is None:
+                if len(path) >= 3:
+                    target = path[2]
+                    directions = list(C.DIRECTIONS)
+                    random.shuffle(directions)
+                    my_pos = c.get_position()
+                    for d in directions:
+                        if c.can_move(d):
+                            pos = my_pos.add(d)
+                            print(pos, target)
+                            if pos.distance_squared(target) <= 2:
+                                break
+                    else:
+                        # Cannot :(
+                        return
+                else:
                     return
-            else:
-                return
 
         movement.move(d)

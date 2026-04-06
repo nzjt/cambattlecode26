@@ -15,9 +15,12 @@ class AStarJPSOptimised:
         elif mode == 1:
             # Conveyor nav (avoid joining)
             self.g: list[list[int]] = [[INF if 2 <= e <= 3 else -1 for e in row] for row in self.tile_manager.env_grid]
-        else:
-            # Bot nav
+        elif mode == 2:
+            # Bot nav (rich)
             self.g: list[list[int]] = [[INF if p else -1 for p in row] for row in self.tile_manager.pass_grid]
+        else:
+            # Bot nav (rich)
+            self.g: list[list[int]] = [[INF if p == 2 else -1 for p in row] for row in self.tile_manager.pass_grid]
 
         for row in self.g:
             row.append(-1)

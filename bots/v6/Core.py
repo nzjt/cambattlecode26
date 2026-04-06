@@ -1,5 +1,6 @@
 from cambc import *
 from Unit import Unit
+from SpawnManager import SpawnManager
 
 
 class Core(Unit):
@@ -7,6 +8,7 @@ class Core(Unit):
         super().__init__(c)
         self.tracker: dict[Position, int] = {}
         self.has_tried_foundry: bool = False
+        self.spawn_manager = SpawnManager()
 
     def run(self, c: Controller):
         super().run(c)
@@ -25,12 +27,8 @@ class Core(Unit):
 
                     self.tracker[pos] = val
 
-        if c.get_current_round() <= 5:
-            for d in Direction:
-                pos = my_pos.add(d)
-                if c.can_spawn(pos):
-                    c.spawn_builder(pos)
-                    break
+        if c.get_current_round() <= 2:
+            self.spawn_manager.spawn(c)
         # elif c.get_current_round() >= 150 and any(v == 3 for v in self.tracker.values()) and not self.has_tried_foundry:
         #     for d in Direction:
         #         pos = my_pos.add(d)
@@ -38,11 +36,7 @@ class Core(Unit):
         #             self.has_tried_foundry = True
         #             c.spawn_builder(pos)
         #             break
-        elif c.get_current_round() >= 100:
-            if c.get_global_resources()[0] >= 800:
-                for d in Direction:
-                    pos = my_pos.add(d)
-                    if c.can_spawn(pos):
-                        c.spawn_builder(pos)
-                        break
-
+        elif c.get_current_round() >= 100 and c.get_global_resources()[0] >= 800:
+            self.spawn_manager.spawn(c)
+        elif self.tracker and self.spawn_manager.spawned < 6:
+            self.spawn_manager.spawn(c)

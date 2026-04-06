@@ -36,6 +36,7 @@ class BuilderBot(Unit):
         self.prev_resources: int = 1000
         self.has_harvester: bool = False
         self.ores: set[Position] = set()
+        self.is_healer: bool = False
 
     def sense(self, c: Controller):
         my_id = c.get_id()
@@ -99,7 +100,7 @@ class BuilderBot(Unit):
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
 
-        if self.target_type <= 2:
+        if self.target_type <= 2 and not self.is_healer:
             for pos in c.get_nearby_tiles(2):
                 if c.get_tile_env(pos) == Environment.ORE_TITANIUM and self.tile_manager.build_harvester[pos.y][pos.x]:
                     for d in Direction:
@@ -166,7 +167,7 @@ class BuilderBot(Unit):
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
-                if env == Environment.ORE_TITANIUM:
+                if env == Environment.ORE_TITANIUM and not self.is_healer:
                     building_id = c.get_tile_building_id(pos)
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
                         dist = my_pos.distance_squared(pos)
@@ -267,6 +268,7 @@ class BuilderBot(Unit):
             self.bfs = Bfs(self.home, self.tile_manager)
             self.nav = AStarNav(self.tile_manager, self.bfs)
             self.prev_resources = c.get_global_resources()[0]
+            self.is_healer = self.birth >= 4
 
             # if self.birth >= 100:
             #     if not FoundryManager.check_foundry(c):
@@ -318,12 +320,16 @@ class BuilderBot(Unit):
             return
 
         if self.target_type == 0:
-            for _ in range(10):
-                self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-                if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
-                    self.target_type = 1
-                    self.expiry = c.get_current_round() + 260
-                    break
+            if self.is_healer and self.home.distance_squared(my_pos) > 30:
+                self.target_type = 1
+                self.target = self.home
+            else:
+                for _ in range(10):
+                    self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
+                    if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
+                        self.target_type = 1
+                        self.expiry = c.get_current_round() + 260
+                        break
 
         if self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
