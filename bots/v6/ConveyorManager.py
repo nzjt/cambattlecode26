@@ -25,20 +25,21 @@ class ConveyorManager:
         self.nav: Nav = nav
         self.home: Position = home
 
-    def compute(self, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
+    def compute(self, tile_manager: TileManager, start: Position, avoid_joining: bool, round: int):
         if avoid_joining:
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
             g: list[list[int]] = a_star.g
-            x, y = self.home
-            env_grid = tile_manager.env_grid
-            if env_grid[y - 2][x + 2] == 3:
-                g[y - 2][x + 2] = 1000000
-            if env_grid[y + 2][x + 2] == 3:
-                g[y + 2][x + 2] = 1000000
-            if env_grid[y - 2][x - 2] == 3:
-                g[y - 2][x - 2] = 1000000
-            if env_grid[y + 2][x - 2] == 3:
-                g[y + 2][x - 2] = 1000000
+            if round >= 100:
+                x, y = self.home
+                env_grid = tile_manager.env_grid
+                if env_grid[y - 2][x + 2] == 3:
+                    g[y - 2][x + 2] = 1000000
+                if env_grid[y + 2][x + 2] == 3:
+                    g[y + 2][x + 2] = 1000000
+                if env_grid[y - 2][x - 2] == 3:
+                    g[y - 2][x - 2] = 1000000
+                if env_grid[y + 2][x - 2] == 3:
+                    g[y + 2][x - 2] = 1000000
         else:
             self.avoid_joining = False
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 1)
@@ -61,7 +62,7 @@ class ConveyorManager:
         return a_star.path
 
     def generate_path(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool = True):
-        path = self.compute(tile_manager, start, avoid_joining)
+        path = self.compute(tile_manager, start, avoid_joining, c.get_current_round())
 
         if path:
             path = self.path = U.normalise_on_grid(path, tile_manager.env_grid)
@@ -80,7 +81,7 @@ class ConveyorManager:
 
     def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager, reroute: bool = False):
         if self.avoid_joining and reroute:
-            path = self.compute(tile_manager, self.path[self.index])
+            path = self.compute(tile_manager, self.path[self.index], True, c.get_current_round())
             if path:
                 self.path = self.path[:self.index] + U.normalise_on_grid(path, tile_manager.env_grid)
                 self.index_path(c)
@@ -406,7 +407,7 @@ class ConveyorManager:
             else:
                 if not c.get_move_cooldown() and not c.get_action_cooldown():
                     dist = pos.distance_squared(self.home)
-                    if dist == 13 or dist == 18:
+                    if c.get_current_round() >= 100 and (dist == 13 or dist == 18):
                         d: Direction = self.home.direction_to(pos)
                         if dist == 17:
                             dx, dy = d.delta()

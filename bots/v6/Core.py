@@ -25,7 +25,7 @@ class Core(Unit):
 
                     self.tracker[pos] = val
 
-        if c.get_current_round() <= 3:
+        if c.get_current_round() <= 5:
             for d in Direction:
                 pos = my_pos.add(d)
                 if c.can_spawn(pos):
