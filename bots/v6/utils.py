@@ -8,12 +8,12 @@ def normalise_on_grid(waypoints: list[Position], env_grid: list[list[int]]):
     for way_point in waypoints:
         d: Direction = path[-1].direction_to(way_point)
         while path[-1] != way_point:
-            # if bridge:
-            #     if path[-1].add(d).distance_squared(path[-2]) <= 9:
-            #         path[-1] = path[-1].add(d)
-            #         continue
-            #     else:
-            #         bridge = False
+            if bridge:
+                if path[-1].add(d).distance_squared(path[-2]) <= 9:
+                    path[-1] = path[-1].add(d)
+                    continue
+                else:
+                    bridge = False
 
             dx, dy = d.delta()
             if dx and dy:
