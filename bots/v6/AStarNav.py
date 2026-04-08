@@ -54,7 +54,6 @@ class AStarNav(Nav):
                     for d in directions:
                         if c.can_move(d):
                             pos = my_pos.add(d)
-                            print(pos, target)
                             if pos.distance_squared(target) <= 2:
                                 break
                     else:

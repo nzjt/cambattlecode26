@@ -199,8 +199,7 @@ class ConveyorManager:
                 building_id = c.get_tile_building_id(self.path[0])
                 if c.get_entity_type(building_id) != EntityType.HARVESTER:
                     if dist == 1:
-                        building_id = c.get_tile_building_id(my_pos)
-                        if c.get_team(building_id) != my_team and not enemy_near:
+                        if c.get_team(c.get_tile_building_id(my_pos)) != my_team and not enemy_near:
                             if c.can_fire(my_pos):
                                 c.fire(my_pos)
                             return
@@ -211,12 +210,17 @@ class ConveyorManager:
 
                         d: Direction = my_pos.direction_to(self.path[0])
                         if not c.get_move_cooldown() and (c.can_move(d) or c.get_global_resources()[0] >= c.get_road_cost()[0]):
-                            if c.can_destroy(self.path[0]):
-                                c.destroy(self.path[0])
-                            if c.can_build_road(self.path[0]):
-                                c.build_road(self.path[0])
-                            movement.move(d)
-                            on_ore = True
+                            bb_id = c.get_tile_builder_bot_id(self.path[0])
+                            if bb_id is None:
+                                if c.get_entity_type(building_id) != EntityType.ROAD:
+                                    if c.can_destroy(self.path[0]):
+                                        c.destroy(self.path[0])
+                                if c.can_build_road(self.path[0]):
+                                    c.build_road(self.path[0])
+                                movement.move(d)
+                                on_ore = True
+                            else:
+                                return
                         else:
                             return
                     else:

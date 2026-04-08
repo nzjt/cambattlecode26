@@ -36,7 +36,7 @@ class Core(Unit):
         #             self.has_tried_foundry = True
         #             c.spawn_builder(pos)
         #             break
-        elif c.get_current_round() >= 100 and c.get_global_resources()[0] >= 800:
+        elif c.get_global_resources()[0] >= 500 and c.get_global_resources()[0] * 2 >= c.get_scale_percent():
             self.spawn_manager.spawn(c)
         elif self.tracker and self.spawn_manager.spawned < 6:
             self.spawn_manager.spawn(c)

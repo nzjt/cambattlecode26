@@ -34,7 +34,6 @@ class Player:
                 random.seed(c.get_id())
                 my_type = c.get_entity_type(c.get_id())
                 self.unit = Player.CLASS[my_type](c)
-
             try:
                 self.unit.run(c)
                 self.safe_exit = True
@@ -44,8 +43,8 @@ class Player:
         else:
             print(
                 f"\033[0;31m{self.death_msg}\n"
-                f"\033[1;33mCaused by bot {c.get_id()} at {c.get_position()}, round {c.get_current_round() - 1}\033[0m",
+                f"\033[1;33mCaused by bot {c.get_id()} at {c.get_position()}, round {c.get_current_round()}\033[0m",
                 file=sys.stderr
             )
-            c.resign(self.death_msg)
-            # c.self_destruct()
+            c.resign(f"{c.get_id()}@{c.get_position()}@{c.get_current_round()}: {self.death_msg}")
+            c.self_destruct()
