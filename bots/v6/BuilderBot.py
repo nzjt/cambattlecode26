@@ -474,6 +474,7 @@ class BuilderBot(Unit):
             else:
                 self.nav.move(c, self.target, self.movement)
 
+        my_pos = c.get_position()
         if c.get_hp() < c.get_max_hp() and self.target_type != 4 and c.can_heal(my_pos):
             c.heal(my_pos)
             self.movement.act(c)
