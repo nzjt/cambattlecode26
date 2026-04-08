@@ -18,10 +18,10 @@ class Gunner(Unit):
         my_team = c.get_team(my_id)
         d = c.get_direction(my_id)
 
-        target = my_pos
-        for _ in range(3):
-            target = target.add(d)
-            if c.can_fire(target):
+        if c.get_ammo_amount():
+            target = my_pos
+            for _ in range(3):
+                target = target.add(d)
                 bb_id = c.get_tile_builder_bot_id(target)
                 if bb_id is not None:
                     if c.get_team(bb_id) == my_team:
@@ -31,13 +31,12 @@ class Gunner(Unit):
                         return
 
                 building_id = c.get_tile_building_id(target)
-                if building_id is not None and c.get_team(building_id) == my_team:
-                    break
+                if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                    if c.get_team(building_id) == my_team:
+                        break
 
-                c.fire(target)
-                break
-            else:
-                break
+                    c.fire(target)
+                    break
 
         if c.get_action_cooldown():
             return
