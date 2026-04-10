@@ -108,6 +108,10 @@ class BuilderBot(Unit):
         elif self.target_type == 5:
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
+        elif self.target_type == 7:
+            if c.is_in_vision(self.target):
+                if c.get_entity_type(c.get_tile_building_id(self.target)) in C.TURRET:
+                    self.target_type = 0
 
         if self.target_type <= 2 and not self.is_healer:
             e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
@@ -289,6 +293,7 @@ class BuilderBot(Unit):
         my_pos = c.get_position()
         my_team = c.get_team()
 
+        U.can_afford = lambda building: not c.get_action_cooldown() and c.get_global_resources()[0] >= getattr(c, f"get_{building}_cost")()[0]
         # self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
 
         if self.target_type == 1:
@@ -484,7 +489,7 @@ class BuilderBot(Unit):
                             dist = my_pos.distance_squared(my_pos)
                             break
 
-            if 1 <= dist <= 2:
+            if 1 <= dist <= 2 and U.can_afford("gunner"):
                 if c.can_destroy(self.target):
                     c.destroy(self.target)
                 d: Direction = self.target.direction_to(self.sub_target)
