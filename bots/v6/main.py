@@ -25,6 +25,8 @@ class Player:
         self.death_msg: str = "TLE!"
 
     def run(self, c: Controller) -> None:
+        if c.get_current_round() == 100:
+            c.resign()
         if self.safe_exit:
             self.safe_exit = False
 

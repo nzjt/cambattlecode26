@@ -11,7 +11,7 @@ class Movement:
 
     def upd(self, c: Controller, emergency: bool = False):
         self.c = c
-        delta = c.get_global_resources()[0] - c.get_harvester_cost()[0]
+        delta = c.get_global_resources()[0] - c.get_foundry_cost()[0]
         if delta >= c.get_road_cost()[0] and not c.get_action_cooldown():
             if emergency:
                 self.can_move = self.can_move_rich_emergency
@@ -29,6 +29,12 @@ class Movement:
         self.can_move = c.can_move
         self.move = c.move
         self.is_rich = False
+
+    def enrich(self, c: Controller):
+        if c.get_global_resources()[0] >= c.get_road_cost()[0]:
+            self.can_move = self.can_move_rich
+            self.move = self.move_rich
+            self.is_rich = True
 
     def can_move_rich(self, d: Direction) -> bool:
         c: Controller = self.c

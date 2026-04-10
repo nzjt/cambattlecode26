@@ -19,7 +19,10 @@ class TileManager:
         self.pass_bitset: list[int] = [0] * H_plus_4
         self.buildable_bitset: list[int] = [0] * H_plus_4
         self.barrier_bitset: list[int] = [0] * H_plus_4
-        self.ore_grid: list[int] = [0] * H_plus_4
+        self.ore_bitset: list[int] = [0] * H_plus_4
+        self.empty_bitset: list[int] = [0] * C.H
+        self.titanium_bitset: list[int] = [0] * C.H
+        self.conveyor_bitset: list[int] = [0] * C.H
         self.ally: int = 0
         self.enemy: int = 0
         self.pass_: int = 0
@@ -33,6 +36,8 @@ class TileManager:
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.has_kill_chamber: bool = False
+        self.axionite_ores: set[Position] = set()
+        self.conveyors: set[Position] = set()
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -82,7 +87,10 @@ class TileManager:
         else:
             clear >>= 4 - x
 
-        pass_bitset, buildable_bitset, ore_bitset, barrier_bitset = self.pass_bitset, self.buildable_bitset, self.ore_grid, self.barrier_bitset
+        pass_bitset, buildable_bitset, ore_bitset, barrier_bitset = self.pass_bitset, self.buildable_bitset, self.ore_bitset, self.barrier_bitset
+        empty_bitset: list[int] = self.empty_bitset
+        titanium_bitset: list[int] = self.titanium_bitset
+        conveyor_bitset: list[int] = self.conveyor_bitset
         env_grid, pass_grid = self.env_grid, self.pass_grid
         for yi in range(max(0, y - 4), min(C.H, y + 5)):
             pass_bitset[yi] &= clear
@@ -104,14 +112,22 @@ class TileManager:
         wander_seen = wander.seen
         wander_unseen = wander.unseen
 
+        conveyors: set[Position] = self.conveyors
+
         for pos in c.get_nearby_tiles():
             xi, yi = pos
             
             building_id = get_tile_building_id(pos)
             env: int = ENV_MAP[get_tile_env(pos)]
             env_grid[yi][xi] = env
-            if env >= 4:
+            if env == 2:
+                empty_bitset[yi] |= 1 << xi
+            elif env >= 4:
                 ore_bitset[yi] |= 1 << xi
+                if env == 4:
+                    titanium_bitset[yi] |= 1 << xi
+                else:
+                    self.axionite_ores.add(pos)
             if building_id is None:
                 if env >= 2:
                     buildable_bitset[yi] |= 1 << xi
@@ -130,6 +146,8 @@ class TileManager:
                     pass_grid[yi][xi] = 2
                     if get_team(building_id) == my_team:
                         env_grid[yi][xi] = 3
+                        conveyors.add(pos)
+                        conveyor_bitset[yi] |= 1 << xi
                         if my_pos.distance_squared(pos) <= 10:
                             wander_seen.add(pos)
                             wander_unseen.discard(pos)
@@ -207,5 +225,12 @@ class TileManager:
         self.enemy = enemy
         self.pass_ = self.get_vision(x, y, self.pass_bitset)
         self.buildable = self.get_vision(x, y, self.buildable_bitset)
-        self.ore = self.get_vision(x, y, self.ore_grid)
+        self.ore = self.get_vision(x, y, self.ore_bitset)
         self.barrier = self.get_vision(x, y, self.barrier_bitset)
+
+    def __getitem__(self, item: str) -> int:
+        bitset: list[int] = getattr(self, f"{item}_bitset")
+        W_plus_1 = C.W + 1
+        return sum(
+            row << (y * W_plus_1) for y, row in enumerate(bitset)
+        )

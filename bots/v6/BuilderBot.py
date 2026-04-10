@@ -21,8 +21,8 @@ class BuilderBot(Unit):
         self.home = c.get_position(c.get_tile_building_id(c.get_position()))
         self.tile_manager = TileManager(self.home)
         self.bfs = Bfs(self.home, self.tile_manager)
-        # self.nav: Nav = AStarNav(self.tile_manager, self.bfs)
-        self.nav: Nav = BfsNav(self.home, self.tile_manager)
+        self.nav: Nav = AStarNav(self.tile_manager, self.bfs)
+        # self.nav: Nav = BfsNav(self.home, self.tile_manager)
         self.prev_resources = c.get_global_resources()[0]
         self.is_healer = self.birth >= 4
         self.movement: Movement = Movement()
@@ -38,6 +38,9 @@ class BuilderBot(Unit):
         self.has_econ: bool = False
         self.has_harvester: bool = False
         self.ores: set[Position] = set()
+        self.routed_titanium: bool = False
+        self.routed_axionite: bool = False
+        self.is_axionite: bool = False
 
         # if self.birth >= 100:
         #     if not FoundryManager.check_foundry(c):
@@ -107,8 +110,9 @@ class BuilderBot(Unit):
                 self.target_type = 0
 
         if self.target_type <= 2 and not self.is_healer:
+            e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
             for pos in c.get_nearby_tiles(2):
-                if c.get_tile_env(pos) == Environment.ORE_TITANIUM and self.tile_manager.build_harvester[pos.y][pos.x]:
+                if c.get_tile_env(pos) == e_type and self.tile_manager.build_harvester[pos.y][pos.x]:
                     for d in Direction:
                         cur = pos.add(d)
                         if U.is_visible(cur):
@@ -118,8 +122,11 @@ class BuilderBot(Unit):
                     else:
                         self.target = pos
                         self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                        self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
                         self.target_type = 3
+                        if self.is_axionite:
+                            self.conveyor_manager.generate_path(c, self.tile_manager, self.target, 2)
+                        else:
+                            self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
                         break
 
         if self.target_type == 6:
@@ -201,24 +208,25 @@ class BuilderBot(Unit):
                                 self.target_type = 4
                                 break
 
-                    if self.tile_manager.build_harvester[pos.y][pos.x] and self.target_type <= 2:
-                        building_id = c.get_tile_building_id(pos)
-                        e_type = c.get_entity_type(building_id)
-                        if e_type == EntityType.BARRIER:
-                            if self.is_troll or c.get_team(building_id) != my_team:
-                                self.ores.discard(pos)
-                                continue
-                        elif e_type == EntityType.HARVESTER:
-                            if self.is_troll:
+                    if self.tile_manager.build_harvester[pos.y][pos.x]:
+                        if self.target_type <= 2:
+                            building_id = c.get_tile_building_id(pos)
+                            e_type = c.get_entity_type(building_id)
+                            if e_type == EntityType.BARRIER:
+                                if self.is_troll or c.get_team(building_id) != my_team:
+                                    self.ores.discard(pos)
+                                    continue
+                            elif e_type == EntityType.HARVESTER:
+                                if self.is_troll:
+                                    self.ores.discard(pos)
+                                    continue
+
+                            if c.get_tile_builder_bot_id(pos) is not None:
                                 self.ores.discard(pos)
                                 continue
 
-                        if c.get_tile_builder_bot_id(pos) is not None:
-                            self.ores.discard(pos)
-                            continue
-
-                        self.ores.add(pos)
-                        self.target_type = 2
+                            self.ores.add(pos)
+                            self.target_type = 2
                     else:
                         self.ores.discard(pos)
 
@@ -248,8 +256,13 @@ class BuilderBot(Unit):
                 #     break
 
             if self.target_type == 2:
+                if self.is_axionite:
+                    ores: set[Position] = self.tile_manager.axionite_ores
+                else:
+                    ores: set[Position] = self.ores
+
                 rem: list[Position] = []
-                for target in self.ores:
+                for target in ores:
                     if c.is_in_vision(target):
                         for d in Direction:
                             pos = target.add(d)
@@ -259,11 +272,11 @@ class BuilderBot(Unit):
                                     rem.append(target)
                                     break
                 for pos in rem:
-                    self.ores.remove(pos)
-                if self.ores:
+                    ores.remove(pos)
+                if ores:
                     closest_dist: int = 10000
                     self.target = None
-                    for pos in self.ores:
+                    for pos in ores:
                         dist = my_pos.distance_squared(pos)
                         if dist < closest_dist:
                             closest_dist = dist
@@ -283,10 +296,20 @@ class BuilderBot(Unit):
                 self.target_type = 0
         elif self.target_type == 3:
             if self.conveyor_manager.done:
+                if self.is_axionite:
+                    self.routed_axionite = True
+                    self.is_axionite = False
+                else:
+                    self.routed_titanium = True
                 self.target_type = 0
 
         self.tile_manager.sense(c, self.home, self.wander)
         self.bfs.update(c, self.conveyor_manager)
+
+        if self.tile_manager.axionite_ores and self.routed_titanium and not self.routed_axionite and self.target_type <= 2:
+            if self.birth == 1:
+                self.target_type = 2
+                self.is_axionite = True
 
         self.sense(c)
         self.movement.upd(c)
@@ -336,38 +359,42 @@ class BuilderBot(Unit):
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
             self.nav.move(c, self.target, self.movement)
         elif self.target_type == 2:
-            c.draw_indicator_line(my_pos, self.target, 0, 255, 0)
-            dist = my_pos.distance_squared(self.target)
-            if self.is_troll:
-                if dist <= 20:
-                    building_id = c.get_tile_building_id(self.target)
-                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
-                        self.nav.move(c, self.target, self.movement)
-                        if c.can_fire(self.target):
-                            c.fire(self.target)
-                            building_id = c.get_tile_building_id(self.target)
-
-                if not dist:
-                    if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_barrier_cost()[0]:
-                        if c.get_team(building_id) == my_team:
-                            for d in C.DIRECTIONS:
-                                if c.can_move(d):
-                                    c.move(d)
-                                    if c.can_destroy(self.target):
-                                        c.destroy(self.target)
-                elif dist > 2:
-                    self.nav.move(c, self.target, self.movement)
-
-                if c.can_build_barrier(self.target):
-                    c.build_barrier(self.target)
-                    self.target_type = 0
+            if self.is_axionite:
+                if my_pos.distance_squared(self.target) > 2:
+                    self.nav.multimove(c, list(self.tile_manager.axionite_ores), self.movement)
             else:
-                if dist > 2:
-                    self.nav.multimove(c, list(self.ores), self.movement)
+                c.draw_indicator_line(my_pos, self.target, 0, 255, 0)
+                dist = my_pos.distance_squared(self.target)
+                if self.is_troll:
+                    if dist <= 20:
+                        building_id = c.get_tile_building_id(self.target)
+                        if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
+                            self.nav.move(c, self.target, self.movement)
+                            if c.can_fire(self.target):
+                                c.fire(self.target)
+                                building_id = c.get_tile_building_id(self.target)
+
+                    if not dist:
+                        if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_barrier_cost()[0]:
+                            if c.get_team(building_id) == my_team:
+                                for d in C.DIRECTIONS:
+                                    if c.can_move(d):
+                                        c.move(d)
+                                        if c.can_destroy(self.target):
+                                            c.destroy(self.target)
+                    elif dist > 2:
+                        self.nav.move(c, self.target, self.movement)
+
+                    if c.can_build_barrier(self.target):
+                        c.build_barrier(self.target)
+                        self.target_type = 0
+                else:
+                    if dist > 2:
+                        self.nav.multimove(c, list(self.ores), self.movement)
         elif self.target_type == 3:
             if not self.conveyor_manager.path:
                 if c.get_cpu_time_elapsed() <= 600:
-                    self.conveyor_manager.generate_path(c, self.tile_manager, self.target, False)
+                    self.conveyor_manager.generate_path(c, self.tile_manager, self.target, 1)
                     if not self.conveyor_manager.path:
                         self.tile_manager.ban_harvester[self.target.y][self.target.x] = True
                         self.target_type = 0
@@ -434,6 +461,11 @@ class BuilderBot(Unit):
                 self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs, True)
 
                 if self.conveyor_manager.done:
+                    if self.is_axionite:
+                        self.routed_axionite = True
+                        self.is_axionite = False
+                    else:
+                        self.routed_titanium = True
                     self.target_type = 0
         elif self.target_type == 6:
             self.foundry_manager.update(c, self.movement, self.tile_manager, self.bfs)
