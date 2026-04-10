@@ -4,7 +4,7 @@ from Movement import Movement
 
 class Nav:
     def move(self, c: Controller, target: Position, movement: Movement) -> None:
-        pass
+        self.multimove(c, [target], movement)
 
     def multimove(self, c: Controller, targets: list[Position], movement: Movement, active: bool = False) -> None:
         pass

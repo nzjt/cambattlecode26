@@ -10,6 +10,7 @@ from FoundryManager import FoundryManager
 from AStarNav import AStarNav
 import consts as C
 import utils as U
+from BfsNav import BfsNav
 from Wander import Wander
 
 
@@ -20,7 +21,8 @@ class BuilderBot(Unit):
         self.home = c.get_position(c.get_tile_building_id(c.get_position()))
         self.tile_manager = TileManager(self.home)
         self.bfs = Bfs(self.home, self.tile_manager)
-        self.nav = AStarNav(self.tile_manager, self.bfs)
+        # self.nav: Nav = AStarNav(self.tile_manager, self.bfs)
+        self.nav: Nav = BfsNav(self.home, self.tile_manager)
         self.prev_resources = c.get_global_resources()[0]
         self.is_healer = self.birth >= 4
         self.movement: Movement = Movement()
@@ -479,7 +481,7 @@ class BuilderBot(Unit):
             c.heal(my_pos)
             self.movement.act(c)
 
-        if self.target_type != 3:
+        if self.target_type != 3 and not c.get_action_cooldown():
             my_pos = c.get_position()
             if not c.get_move_cooldown():
                 for d in C.DIRECTIONS:
