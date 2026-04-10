@@ -20,7 +20,7 @@ class Gunner(Unit):
 
         if c.get_ammo_amount():
             target = my_pos
-            for _ in range(3):
+            for _ in range(3 if d in C.CARDINAL else 2):
                 target = target.add(d)
                 bb_id = c.get_tile_builder_bot_id(target)
                 if bb_id is not None:
