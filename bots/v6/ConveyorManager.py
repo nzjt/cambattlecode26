@@ -213,7 +213,7 @@ class ConveyorManager:
         my_team = c.get_team()
         if c.is_in_vision(self.path[0]):
             building_id = c.get_tile_building_id(self.path[0])
-            if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
+            if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
                 self.done = True
                 return
 
@@ -271,7 +271,8 @@ class ConveyorManager:
             dist = my_pos.distance_squared(self.path[0])
             if dist <= 13:
                 building_id = c.get_tile_building_id(self.path[0])
-                if c.get_entity_type(building_id) != EntityType.HARVESTER:
+                e_type: EntityType = c.get_entity_type(building_id)
+                if e_type != EntityType.HARVESTER:
                     if dist == 1:
                         if c.get_team(c.get_tile_building_id(my_pos)) != my_team and not enemy_near:
                             if c.can_fire(my_pos):
@@ -289,8 +290,7 @@ class ConveyorManager:
                                 if c.get_entity_type(building_id) != EntityType.ROAD:
                                     if c.can_destroy(self.path[0]):
                                         c.destroy(self.path[0])
-                                if c.can_build_road(self.path[0]):
-                                    c.build_road(self.path[0])
+                                movement.enrich(c)
                                 movement.move(d)
                                 on_ore = True
                             else:
@@ -305,6 +305,12 @@ class ConveyorManager:
         if on_ore:
             pos: Position = self.path[1]
             do_build = True
+            building_id = c.get_tile_building_id(my_pos)
+            e_type: EntityType = c.get_entity_type(building_id)
+            if e_type == EntityType.ROAD and c.get_team(building_id) != my_team:
+                if c.can_fire(my_pos):
+                    c.fire(my_pos)
+
             if not build_barriers():
                 return
 
