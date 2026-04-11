@@ -3,7 +3,6 @@ from cambc import *
 
 def normalise_on_grid(waypoints: list[Position], env_grid: list[list[int]]):
     path: list[Position] = [waypoints[0]]
-    parity: bool = False
     bridge: bool = False
     for way_point in waypoints:
         d: Direction = path[-1].direction_to(way_point)
@@ -34,26 +33,15 @@ def normalise_on_grid(waypoints: list[Position], env_grid: list[list[int]]):
                         parity = True
                         continue
 
-                if parity:
-                    if env_grid[y][x + dx] == 2:
-                        path.append(Position(x + dx, y))
-                        parity = False
-                    elif env_grid[y + dy][x] == 2:
-                        path.append(Position(x, y + dy))
-                    else:
-                        bridge = True
+                if env_grid[y][x + dx] == 2:
+                    path.append(Position(x + dx, y))
+                elif env_grid[y + dy][x] == 2:
+                    path.append(Position(x, y + dy))
                 else:
-                    if env_grid[y + dy][x] == 2:
-                        path.append(Position(x, y + dy))
-                        parity = True
-                    elif env_grid[y][x + dx] == 2:
-                        path.append(Position(x + dx, y))
-                    else:
-                        bridge = True
+                    bridge = True
                 path.append(Position(x + dx, y + dy))
             else:
                 path.append(path[-1].add(d))
-                parity = bool(dx)
     return path
 
 

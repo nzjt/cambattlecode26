@@ -1,6 +1,7 @@
 from cambc import *
 from Unit import Unit
 import consts as C
+import utils as U
 
 
 class Gunner(Unit):
@@ -22,20 +23,23 @@ class Gunner(Unit):
             target = my_pos
             for _ in range(3 if d in C.CARDINAL else 2):
                 target = target.add(d)
-                bb_id = c.get_tile_builder_bot_id(target)
-                if bb_id is not None:
-                    if c.get_team(bb_id) == my_team:
-                        break
-                    else:
+                if U.on_the_map(target):
+                    bb_id = c.get_tile_builder_bot_id(target)
+                    if bb_id is not None:
+                        if c.get_team(bb_id) == my_team:
+                            break
+                        else:
+                            c.fire(target)
+                            return
+
+                    building_id = c.get_tile_building_id(target)
+                    if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                        if c.get_team(building_id) == my_team:
+                            break
+
                         c.fire(target)
-                        return
-
-                building_id = c.get_tile_building_id(target)
-                if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
-                    if c.get_team(building_id) == my_team:
                         break
-
-                    c.fire(target)
+                else:
                     break
 
         if c.get_action_cooldown():
@@ -45,23 +49,29 @@ class Gunner(Unit):
         useful: bool = False
         for _ in range(3 if d in C.CARDINAL else 2):
             target = target.add(d)
-            building_id = c.get_tile_building_id(target)
-            if building_id is not None:
-                if c.get_team(building_id) == my_team:
-                    break
-                else:
-                    useful = True
-                    break
+            if U.on_the_map(target):
+                building_id = c.get_tile_building_id(target)
+                if building_id is not None:
+                    if c.get_team(building_id) == my_team:
+                        break
+                    else:
+                        useful = True
+                        break
+            else:
+                break
 
         if not useful:
             for d in C.DIRECTIONS:
                 target = my_pos
                 for _ in range(3 if d in C.CARDINAL else 2):
                     target = target.add(d)
-                    building_id = c.get_tile_building_id(target)
-                    if building_id is not None:
-                        if c.get_team(building_id) == my_team:
-                            break
-                        elif c.get_entity_type(building_id) not in C.UNIMPORTANT:
-                            c.rotate(d)
-                            return
+                    if U.on_the_map(target):
+                        building_id = c.get_tile_building_id(target)
+                        if building_id is not None:
+                            if c.get_team(building_id) == my_team:
+                                break
+                            elif c.get_entity_type(building_id) not in C.UNIMPORTANT:
+                                c.rotate(d)
+                                return
+                    else:
+                        break

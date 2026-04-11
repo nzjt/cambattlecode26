@@ -46,7 +46,6 @@ EMERGENCY_DESTROY = {
     EntityType.BARRIER
 }
 DESTROY_ENEMY = {
-    EntityType.MARKER,
     EntityType.ROAD,
     EntityType.CONVEYOR,
     EntityType.ARMOURED_CONVEYOR,

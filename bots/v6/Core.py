@@ -14,13 +14,14 @@ class Core(Unit):
         super().run(c)
         my_pos = c.get_position(c.get_id())
 
-        ti, ax = c.get_global_resources()
-        needed_titanium: int = c.get_builder_bot_cost()[0] - ti
-        if needed_titanium > 0:
-            if ax * 4 <= needed_titanium:
-                c.convert(ax)
-            else:
-                c.convert((needed_titanium + 3) // 4)
+        if c.get_current_round() <= 1900:
+            ti, ax = c.get_global_resources()
+            needed_titanium: int = c.get_builder_bot_cost()[0] - ti
+            if needed_titanium > 0:
+                if ax * 4 <= needed_titanium:
+                    c.convert(ax)
+                else:
+                    c.convert((needed_titanium + 3) // 4)
 
         for building_id in c.get_nearby_buildings(5):
             if c.get_entity_type(building_id) == EntityType.CONVEYOR:

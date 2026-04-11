@@ -126,8 +126,41 @@ class TileManager:
                 ore_bitset[yi] |= 1 << xi
                 if env == 4:
                     titanium_bitset[yi] |= 1 << xi
+                    if self.ban_harvester[yi][xi]:
+                        self.build_harvester[yi][xi] = False
+                    elif building_id is not None:
+                        e_type = get_entity_type(building_id)
+                        if e_type == EntityType.HARVESTER:
+                            self.build_harvester[yi][xi] = False
+                            if pos.distance_squared(my_pos) <= 13:
+                                if pos.distance_squared(home) > 5:
+                                    has_space, has_conveyor = False, False
+                                    for d in C.CARDINAL:
+                                        cur: Position = pos.add(d)
+                                        if U.on_the_map(cur):
+                                            b_id = c.get_tile_building_id(cur)
+                                            if b_id is None:
+                                                has_space |= c.get_tile_env(cur) == Environment.EMPTY
+                                            else:
+                                                if c.get_team(b_id) != my_team:
+                                                    continue
+                                                e_type = c.get_entity_type(b_id)
+                                                if e_type in C.CONVEYOR_VARIANT:
+                                                    has_conveyor = True
+                                                    break
+                                                elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
+                                                    has_space = True
+                                    if not has_conveyor and has_space:
+                                        self.build_harvester[yi][xi] = True
                 else:
-                    self.axionite_ores.add(pos)
+                    if self.ban_harvester[yi][xi]:
+                        self.build_harvester[yi][xi] = False
+                        self.axionite_ores.discard(pos)
+                    elif building_id is not None and c.get_entity_type(building_id) == EntityType.HARVESTER:
+                        self.build_harvester[yi][xi] = False
+                        self.axionite_ores.discard(pos)
+                    else:
+                        self.axionite_ores.add(pos)
             if building_id is None:
                 if env >= 2:
                     buildable_bitset[yi] |= 1 << xi
@@ -189,37 +222,6 @@ class TileManager:
                 else:
                     lo = round
                 bot_tracker[bb_id] = (pos, lo, round)
-
-            if env == 4:
-                if self.ban_harvester[yi][xi]:
-                    self.build_harvester[yi][xi] = False
-                elif building_id is not None:
-                    e_type = get_entity_type(building_id)
-                    if e_type == EntityType.HARVESTER:
-                        self.build_harvester[yi][xi] = False
-                        if pos.distance_squared(my_pos) <= 13:
-                            if pos.distance_squared(home) <= 5:
-                                continue
-                            has_space, has_conveyor = False, False
-                            for d in C.CARDINAL:
-                                cur: Position = pos.add(d)
-                                if U.on_the_map(cur):
-                                    building_id = c.get_tile_building_id(cur)
-                                    if building_id is None:
-                                        has_space |= c.get_tile_env(cur) == Environment.EMPTY
-                                    else:
-                                        if c.get_team(building_id) != my_team:
-                                            continue
-                                        e_type = c.get_entity_type(building_id)
-                                        if e_type in C.CONVEYOR_VARIANT:
-                                            has_conveyor = True
-                                            break
-                                        elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
-                                            has_space = True
-                            if has_conveyor or not has_space:
-                                continue
-
-                            self.build_harvester[yi][xi] = True
 
         self.ally = ally & -0x100000000001
         self.enemy = enemy

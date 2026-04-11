@@ -124,13 +124,16 @@ class BuilderBot(Unit):
                             if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
                                 break
                     else:
-                        self.target = pos
                         self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                        self.target_type = 3
                         if self.is_axionite:
-                            self.conveyor_manager.generate_path(c, self.tile_manager, self.target, 2)
+                            self.conveyor_manager.generate_path(c, self.tile_manager, pos, 2)
+                            if not self.conveyor_manager.path:
+                                self.tile_manager.ban_harvester[pos.y][pos.x] = True
+                                continue
                         else:
-                            self.conveyor_manager.generate_path(c, self.tile_manager, self.target)
+                            self.conveyor_manager.generate_path(c, self.tile_manager, pos)
+                        self.target = pos
+                        self.target_type = 3
                         break
 
         if self.target_type == 6:
@@ -407,6 +410,7 @@ class BuilderBot(Unit):
             if self.conveyor_manager.path:
                 self.conveyor_manager.update(c, self.movement, self.tile_manager, self.bfs, False)
                 if not self.conveyor_manager.index:
+                    self.tile_manager.ban_harvester[self.target.y][self.target.x] = True
                     self.target_type = 0
         elif self.target_type == 4:
             sentinel_targets: list[Position] = []
@@ -500,6 +504,7 @@ class BuilderBot(Unit):
             if self.target_type and dist:
                 self.nav.move(c, self.target, self.movement)
         elif self.target_type == 9:
+            self.movement.enrich(c)
             if c.is_in_vision(self.target):
                 building_id = c.get_tile_building_id(self.target)
                 if c.get_hp(building_id) == c.get_max_hp(building_id):
