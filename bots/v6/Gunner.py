@@ -51,12 +51,9 @@ class Gunner(Unit):
             target = target.add(d)
             if U.on_the_map(target):
                 building_id = c.get_tile_building_id(target)
-                if building_id is not None:
-                    if c.get_team(building_id) == my_team:
-                        break
-                    else:
-                        useful = True
-                        break
+                if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                    useful = c.get_team(building_id) != my_team
+                    break
             else:
                 break
 
