@@ -362,6 +362,11 @@ class BuilderBot(Unit):
                         break
 
         if self.target_type <= 2:
+            for pos, destroy in self.tile_manager.gunners.items():
+                if destroy:
+                    if c.can_destroy(pos):
+                        c.destroy(pos)
+
             def try_repair():
                 building_grid = self.tile_manager.building_grid
                 x, y = my_pos
@@ -404,8 +409,8 @@ class BuilderBot(Unit):
             buildable: int = self.tile_manager["buildable"]
             repair: int = (had_building ^ has_building) & buildable
             if repair:
-                print("repair!", repair >> (28 * (C.W + 1) + 16) & 1)
                 self.bfs_nav.multimove(c, repair, self.movement)
+                my_pos = c.get_position()
                 try_repair()
                 self.target_type = ~self.target_type
 

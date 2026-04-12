@@ -41,6 +41,8 @@ class TileManager:
         self.has_kill_chamber: bool = False
         self.axionite_ores: set[Position] = set()
         self.conveyors: set[Position] = set()
+        self.gunners: dict[Position, bool] = {}
+        self.gunner_covered: int = 0
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -131,9 +133,11 @@ class TileManager:
 
         conveyors: set[Position] = self.conveyors
 
+        gunners: dict[Position, bool] = self.gunners
+
         for pos in c.get_nearby_tiles():
             xi, yi = pos
-            
+
             building_id = get_tile_building_id(pos)
             env: int = ENV_MAP[get_tile_env(pos)]
             env_grid[yi][xi] = env
@@ -225,6 +229,8 @@ class TileManager:
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:
+                        if pos not in gunners:
+                            gunners[pos] = False
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
@@ -252,6 +258,32 @@ class TileManager:
         self.buildable = self.get_vision(x, y, self.buildable_bitset)
         self.ore = self.get_vision(x, y, self.ore_bitset)
         self.barrier = self.get_vision(x, y, self.barrier_bitset)
+
+        def destroy_gunner(pos: Position, building_id: int) -> bool:
+            d: Direction = c.get_direction(building_id)
+            for _ in range(3 if d in C.CARDINAL else 2):
+                pos = pos.add(d)
+                if U.on_the_map(pos):
+                    if c.is_in_vision(pos):
+                        if get_tile_env(pos) == Environment.WALL:
+                            return True
+                        building_id = get_tile_building_id(pos)
+                        e_type = get_entity_type(building_id)
+                        if get_team(building_id) != my_team and e_type != EntityType.MARKER:
+                            return False
+                    else:
+                        return False
+                else:
+                    return True
+
+            return True
+
+        self.gunners = {
+            pos: destroy_gunner(pos, building_id) if visible else gunners[pos] for pos in gunners if not (visible := c.is_in_vision(pos)) or (
+                        (building_id := get_tile_building_id(pos)) is not None and get_entity_type(
+                    building_id) == EntityType.GUNNER and get_team(building_id) == my_team)
+        }
+        gunner_covered: int = 0
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")
