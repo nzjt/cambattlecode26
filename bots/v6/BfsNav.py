@@ -12,9 +12,9 @@ class BfsNav(Nav):
         self.home: Position = home
         self.tile_manager: TileManager = tile_manager
 
-    def multimove(self, c: Controller, targets: list[Position], movement: Movement, active: bool = False) -> None:
+    def multimove(self, c: Controller, targets: list[Position] | int, movement: Movement, active: bool = False) -> None:
         W_plus_1: int = C.W + 1
-        target: int = sum(
+        target: int = targets if isinstance(targets, int) else sum(
             1 << (y * W_plus_1 + x) for x, y in targets
         )
 

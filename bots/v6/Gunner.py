@@ -42,7 +42,7 @@ class Gunner(Unit):
                 else:
                     break
 
-        if c.get_action_cooldown():
+        if c.get_action_cooldown() or c.get_global_resources()[0] < 10:
             return
 
         target = my_pos

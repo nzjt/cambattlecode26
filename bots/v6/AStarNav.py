@@ -60,4 +60,5 @@ class AStarNav(Nav):
                 else:
                     return
 
-        movement.move(d)
+        if movement.can_move(d):
+            movement.move(d)
