@@ -41,7 +41,8 @@ class TileManager:
         self.has_kill_chamber: bool = False
         self.axionite_ores: set[Position] = set()
         self.conveyors: set[Position] = set()
-        self.gunners: dict[Position, bool] = {}
+        self.gunners: dict[Position, list] = {}
+        self.gunner_covered_grid: list[list[bool]] = []
         self.gunner_covered: int = 0
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
@@ -133,7 +134,7 @@ class TileManager:
 
         conveyors: set[Position] = self.conveyors
 
-        gunners: dict[Position, bool] = self.gunners
+        gunners: dict[Position, list] = self.gunners
 
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -229,8 +230,10 @@ class TileManager:
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:
-                        if pos not in gunners:
-                            gunners[pos] = False
+                        if pos in gunners:
+                            gunners[pos][0] = get_direction(building_id)
+                        else:
+                            gunners[pos] = [get_direction(building_id), False]
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
@@ -259,31 +262,51 @@ class TileManager:
         self.ore = self.get_vision(x, y, self.ore_bitset)
         self.barrier = self.get_vision(x, y, self.barrier_bitset)
 
-        def destroy_gunner(pos: Position, building_id: int) -> bool:
-            d: Direction = c.get_direction(building_id)
+        self.gunners = {
+            k: v for k, v in gunners.items() if not c.is_in_vision(k) or ((building_id := get_tile_building_id(k)) is not None and get_entity_type(building_id) == EntityType.GUNNER and get_team(building_id) == my_team)
+        }
+        for pos, info in self.gunners.items():
+            d = info[0]
             for _ in range(3 if d in C.CARDINAL else 2):
                 pos = pos.add(d)
                 if U.on_the_map(pos):
                     if c.is_in_vision(pos):
                         if get_tile_env(pos) == Environment.WALL:
-                            return True
+                            info[1] = True
+                            break
+                        bb_id = get_tile_builder_bot_id(pos)
+                        if bb_id is not None:
+                            if c.get_team(bb_id) != my_team:
+                                info[1] = False
+                                break
+
                         building_id = get_tile_building_id(pos)
                         e_type = get_entity_type(building_id)
-                        if get_team(building_id) != my_team and e_type != EntityType.MARKER:
-                            return False
+                        if get_team(building_id) == my_team:
+                            if e_type in C.TURRET:
+                                info[1] = True
+                                break
+                        else:
+                            if e_type not in C.UNIMPORTANT:
+                                info[1] = False
+                                break
                     else:
-                        return False
+                        break
                 else:
-                    return True
+                    info[1] = True
+                    break
+            else:
+                info[1] = True
 
-            return True
-
-        self.gunners = {
-            pos: destroy_gunner(pos, building_id) if visible else gunners[pos] for pos in gunners if not (visible := c.is_in_vision(pos)) or (
-                        (building_id := get_tile_building_id(pos)) is not None and get_entity_type(
-                    building_id) == EntityType.GUNNER and get_team(building_id) == my_team)
-        }
         gunner_covered: int = 0
+        gunner_covered_grid = self.gunner_covered_grid = [[False] * C.W for _ in range(C.H)]
+        for pos, info in self.gunners.items():
+            d, destroy = info
+            if not destroy:
+                for _ in range(3 if d in C.CARDINAL else 2):
+                    pos = pos.add(d)
+                    if U.on_the_map(pos):
+                        gunner_covered_grid[pos.y][pos.x] = True
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")

@@ -238,22 +238,58 @@ class BuilderBot(Unit):
                         self.ores.discard(pos)
 
                 building_id = c.get_tile_building_id(pos)
+                e_type = c.get_entity_type(building_id)
                 if c.get_team(building_id) == my_team:
-                    e_type = c.get_entity_type(building_id)
                     if e_type not in C.UNIMPORTANT:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             self.target = pos
                             self.target_type = 9
                             break
-
-                        if e_type in C.CONVEYOR:
-                            nxt = pos.add(c.get_direction(building_id))
+                elif e_type in C.DANGEROUS:
+                    x, y = pos
+                    if not self.tile_manager.gunner_covered_grid[y][x]:
+                        for d in C.CARDINAL:
+                            nxt: Position = pos.add(d)
                             if U.is_visible(nxt):
                                 building_id = c.get_tile_building_id(nxt)
-                                if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
-                                    self.target = pos
-                                    self.sub_target = nxt
+                                if c.get_team(building_id) == my_team:
+                                    e_type = c.get_entity_type(building_id)
+                                    if e_type == EntityType.BRIDGE:
+                                        if pos != c.get_bridge_target(building_id):
+                                            continue
+                                    elif e_type in C.CONVEYOR_VARIANT:
+                                        if d != c.get_direction(building_id).opposite():
+                                            continue
+                                    else:
+                                        continue
+                                    self.target = nxt
+                                    self.sub_target = pos
                                     self.target_type = 7
+                                    break
+
+                        if self.target_type < 7:
+                            for d in C.CARDINAL:
+                                nxt: Position = pos.add(d)
+                                for e in C.CARDINAL:
+                                    if e == d.opposite():
+                                        continue
+                                    adj: Position = nxt.add(e)
+                                    if U.is_visible(adj):
+                                        building_id = c.get_tile_building_id(adj)
+                                        if c.get_team(building_id) == my_team:
+                                            e_type = c.get_entity_type(building_id)
+                                            if e_type == EntityType.BRIDGE:
+                                                if pos != c.get_bridge_target(building_id):
+                                                    continue
+                                            elif e_type in C.CONVEYOR_VARIANT:
+                                                if d != c.get_direction(building_id).opposite():
+                                                    continue
+                                            else:
+                                                continue
+                                            self.target = adj
+                                            self.sub_target = pos
+                                            self.target_type = 7
+                                            break
                 # if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
                 #     # Need to repair!
                 #     print("rep", pos)
@@ -362,8 +398,8 @@ class BuilderBot(Unit):
                         break
 
         if self.target_type <= 2:
-            for pos, destroy in self.tile_manager.gunners.items():
-                if destroy:
+            for pos, info in self.tile_manager.gunners.items():
+                if info[1]:
                     if c.can_destroy(pos):
                         c.destroy(pos)
 
@@ -371,20 +407,27 @@ class BuilderBot(Unit):
                 building_grid = self.tile_manager.building_grid
                 x, y = my_pos
                 if building_grid[y][x] is not None:
+                    e_type: EntityType
                     e_type, extra = building_grid[y][x]
                     building_id = c.get_tile_building_id(my_pos)
                     if c.get_team(building_id) != my_team:
                         if c.can_fire(my_pos):
                             c.fire(my_pos)
                     elif c.get_entity_type(building_id) in C.UNIMPORTANT:
-                        if U.can_afford(e_type):
+                        if U.can_afford(e_type.value):
                             c.destroy(my_pos)
 
-                    if c.can_build(e_type, my_pos, extra):
-                        c.build(e_type, my_pos, extra)
-                        self.tile_manager.has_building_bitset[y] |= 1 << x
-                        self.movement.act(c)
-                        return
+                    if isinstance(extra, Direction):
+                        nxt = my_pos.add(extra)
+                    else:
+                        nxt = extra
+                    building_id = c.get_tile_building_id(nxt)
+                    if c.get_team(building_id) == my_team or c.get_entity_type(building_id) in C.UNIMPORTANT:
+                        if c.can_build(e_type, my_pos, extra):
+                            c.build(e_type, my_pos, extra)
+                            self.tile_manager.has_building_bitset[y] |= 1 << x
+                            self.movement.act(c)
+                            return
 
                 for d in C.DIRECTIONS:
                     pos = my_pos.add(d)
@@ -394,14 +437,20 @@ class BuilderBot(Unit):
                             e_type, extra = building_grid[y][x]
                             building_id = c.get_tile_building_id(pos)
                             if c.get_team(building_id) == my_team and c.get_entity_type(building_id) in C.UNIMPORTANT:
-                                if U.can_afford(e_type):
+                                if U.can_afford(e_type.value):
                                     c.destroy(pos)
 
-                            if c.can_build(e_type, pos, extra):
-                                c.build(e_type, pos, extra)
-                                self.tile_manager.has_building_bitset[y] |= 1 << x
-                                self.movement.act(c)
-                                return
+                            if isinstance(extra, Direction):
+                                nxt = pos.add(extra)
+                            else:
+                                nxt = extra
+                            building_id = c.get_tile_building_id(nxt)
+                            if c.get_team(building_id) == my_team or c.get_entity_type(building_id) in C.UNIMPORTANT:
+                                if c.can_build(e_type, pos, extra):
+                                    c.build(e_type, pos, extra)
+                                    self.tile_manager.has_building_bitset[y] |= 1 << x
+                                    self.movement.act(c)
+                                    return
 
             try_repair()
             had_building: int = self.tile_manager["had_building"]

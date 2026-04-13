@@ -74,6 +74,10 @@ CHAMBER_WALL = {
     EntityType.BARRIER,
     EntityType.LAUNCHER
 }
+DANGEROUS = {
+    EntityType.CORE,
+    EntityType.BARRIER
+} | TURRET
 DIRECTION_MAP = {
     (0, -1): Direction.NORTH,
     (1, -1): Direction.NORTHEAST,
