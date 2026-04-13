@@ -578,7 +578,7 @@ class ConveyorManager:
                     if self.conveyor is None:
                         for d in C.CARDINAL:
                             cur: Position = pos.add(d)
-                            if cur != self.splitter and U.on_the_map(cur):
+                            if cur != self.splitter and U.on_the_map(cur) and c.get_tile_env(cur) == Environment.EMPTY:
                                 building_id: int = c.get_tile_building_id(cur)
                                 if c.get_team(building_id) == my_team:
                                     if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT:
