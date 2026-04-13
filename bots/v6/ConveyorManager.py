@@ -576,12 +576,13 @@ class ConveyorManager:
 
                 if c.get_entity_type(c.get_tile_building_id(self.splitter)) == EntityType.SPLITTER:
                     if self.conveyor is None:
+                        can_replace = C.UNIMPORTANT | {EntityType.BARRIER}
                         for d in C.CARDINAL:
                             cur: Position = pos.add(d)
                             if cur != self.splitter and U.on_the_map(cur) and c.get_tile_env(cur) == Environment.EMPTY:
                                 building_id: int = c.get_tile_building_id(cur)
                                 if c.get_team(building_id) == my_team:
-                                    if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT:
+                                    if building_id is None or (e_type := c.get_entity_type(building_id)) in can_replace:
                                         self.conveyor = cur  # TODO: ?
                                         break
                                     elif e_type in C.CONVEYOR:
@@ -595,6 +596,7 @@ class ConveyorManager:
                                         self.conveyor = cur
                                         break
 
+                        print(self.conveyor)
                         if self.conveyor is None:
                             return  # BRUH
 
