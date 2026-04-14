@@ -26,7 +26,7 @@ class ConveyorManager:
         self.splitter: Position | None = None
         self.conveyor: Position | None = None
 
-    def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool):
+    def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
         if avoid_joining:
             a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
             g: list[list[int]] = a_star.g
@@ -47,30 +47,31 @@ class ConveyorManager:
             g: list[list[int]] = a_star.g
 
         # TODO: replace with BFS
-        my_team = c.get_team()
-        ban: list[tuple[int, int]] = []
-        for d in C.DIRECTIONS:
-            cur: Position = start.add(d)
-            if U.on_the_map(cur):
-                building_id = c.get_tile_building_id(cur)
-                if c.get_team(building_id) != my_team:
-                    if c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
-                        xi, yi = cur
-                        g[yi][xi] = -1
-                        ban.append((xi, yi))
-        x, y = start
-        blocked_N: bool = g[y - 1][x] == -1
-        blocked_E: bool = g[y][x + 1] == -1
-        blocked_S: bool = g[y + 1][x] == -1
-        blocked_W: bool = g[y][x - 1] == -1
-        if blocked_N and blocked_E:
-            g[y - 1][x + 1] = -1
-        if blocked_E and blocked_S:
-            g[y + 1][x + 1] = -1
-        if blocked_S and blocked_W:
-            g[y + 1][x - 1] = -1
-        if blocked_W and blocked_N:
-            g[y - 1][x - 1] = -1
+        if is_harvester:
+            my_team = c.get_team()
+            ban: list[tuple[int, int]] = []
+            for d in C.DIRECTIONS:
+                cur: Position = start.add(d)
+                if U.on_the_map(cur):
+                    building_id = c.get_tile_building_id(cur)
+                    if c.get_team(building_id) != my_team:
+                        if c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
+                            xi, yi = cur
+                            g[yi][xi] = -1
+                            ban.append((xi, yi))
+            x, y = start
+            blocked_N: bool = g[y - 1][x] == -1
+            blocked_E: bool = g[y][x + 1] == -1
+            blocked_S: bool = g[y + 1][x] == -1
+            blocked_W: bool = g[y][x - 1] == -1
+            if blocked_N and blocked_E:
+                g[y - 1][x + 1] = -1
+            if blocked_E and blocked_S:
+                g[y + 1][x + 1] = -1
+            if blocked_S and blocked_W:
+                g[y + 1][x - 1] = -1
+            if blocked_W and blocked_N:
+                g[y - 1][x - 1] = -1
 
         a_star.compute(start, [self.home], True)
         return a_star.path
@@ -176,7 +177,7 @@ class ConveyorManager:
 
     def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager, stuck: bool = False):
         if self.mode == 0:
-            path = self.compute(c, tile_manager, self.path[self.index], True)
+            path = self.compute(c, tile_manager, self.path[self.index], True, False)
             if path:
                 path = U.normalise_on_grid(path, tile_manager.env_grid)
                 if len(path) < len(self.path) - self.index:
@@ -489,17 +490,22 @@ class ConveyorManager:
             cur: Position = pos
             for _ in range(3 if di in C.CARDINAL else 2):
                 cur = cur.add(di)
-                if U.on_the_map(cur):
-                    if c.is_in_vision(cur):
-                        if c.get_tile_env(cur) != Environment.WALL:
-                            b_id = c.get_tile_building_id(cur)
-                            if b_id is not None and c.get_entity_type(b_id) != EntityType.MARKER:
-                                keep_gunner = c.get_team(b_id) != my_team
-                                break
-                        else:
-                            break
-                    else:
+                if U.is_visible(cur):
+                    if c.get_tile_env(cur) == Environment.WALL:
                         break
+                    else:
+                        b_id = c.get_tile_building_id(cur)
+                        if b_id is not None:
+                            e_type = c.get_entity_type(b_id)
+                            if c.get_team(b_id) == my_team:
+                                if e_type in C.UNIMPORTANT:
+                                    continue
+                            else:
+                                if e_type == EntityType.MARKER:
+                                    continue
+                                else:
+                                    keep_gunner = True
+                            break
                 else:
                     break
 

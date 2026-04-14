@@ -20,27 +20,41 @@ class Gunner(Unit):
         d = c.get_direction(my_id)
 
         if c.get_ammo_amount():
+            do_fire: bool = False
+            actual_target = None
             target = my_pos
             for _ in range(3 if d in C.CARDINAL else 2):
                 target = target.add(d)
                 if U.on_the_map(target):
                     bb_id = c.get_tile_builder_bot_id(target)
                     if bb_id is not None:
-                        if c.get_team(bb_id) == my_team:
-                            break
-                        else:
-                            c.fire(target)
-                            return
+                        if c.get_team(bb_id) != my_team:
+                            if actual_target is None:
+                                actual_target = target
+                            do_fire = True
+                        break
 
                     building_id = c.get_tile_building_id(target)
-                    if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
+                    if building_id is not None:
+                        e_type = c.get_entity_type(building_id)
                         if c.get_team(building_id) == my_team:
-                            break
-
-                        c.fire(target)
-                        break
+                            if e_type == EntityType.ROAD:
+                                if actual_target is None:
+                                    actual_target = target
+                            elif e_type != EntityType.MARKER:
+                                break
+                        else:
+                            if c.get_entity_type(building_id) != EntityType.MARKER:
+                                if actual_target is None:
+                                    actual_target = target
+                                do_fire = True
+                                break
                 else:
                     break
+
+            if do_fire:
+                c.fire(actual_target)
+                return
 
         if c.get_action_cooldown() or c.get_global_resources()[0] < 10:
             return
