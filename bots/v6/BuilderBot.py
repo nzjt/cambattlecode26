@@ -152,7 +152,7 @@ class BuilderBot(Unit):
         elif self.target_type == 3:
             if self.conveyor_manager.path:
                 retargets: list[Position] = []
-                reroute: bool = False
+                stuck: bool = False
                 path_index = self.conveyor_manager.path_index
                 for pos in c.get_nearby_tiles():
                     building_id = c.get_tile_building_id(pos)
@@ -162,7 +162,7 @@ class BuilderBot(Unit):
                         if cur_index >= self.conveyor_manager.index:
                             if cur_index == self.conveyor_manager.index:
                                 self.conveyor_manager.avoid_joining = False
-                            reroute |= cur_index < 1000000
+                            stuck |= cur_index < 1000000
                             good = True
                             cur = pos
                             for _ in range(10):
@@ -190,7 +190,7 @@ class BuilderBot(Unit):
                             if good:
                                 retargets.append(pos)
 
-                self.conveyor_manager.retarget(c, retargets, self.tile_manager, reroute)
+                self.conveyor_manager.retarget(c, retargets, self.tile_manager, stuck)
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)

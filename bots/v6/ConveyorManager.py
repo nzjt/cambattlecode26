@@ -174,16 +174,18 @@ class ConveyorManager:
             x, y = path[i]
             path_index[y][x] = i
 
-    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager, reroute: bool = False):
-        if self.mode == 0 and reroute:
+    def retarget(self, c: Controller, retargets: list[Position], tile_manager: TileManager, stuck: bool = False):
+        if self.mode == 0:
             path = self.compute(c, tile_manager, self.path[self.index], True)
             if path:
-                self.path = self.path[:self.index] + U.normalise_on_grid(path, tile_manager.env_grid)
-                self.index_path(c)
-                for i in range(1, len(path)):
-                    c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
-                return
-            else:
+                path = U.normalise_on_grid(path, tile_manager.env_grid)
+                if len(path) < len(self.path) - self.index:
+                    self.path = self.path[:self.index] + path
+                    self.index_path(c)
+                    for i in range(1, len(path)):
+                        c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+                    return
+            elif stuck:
                 self.mode = 1
 
         if self.mode == 1:  # TODO: allow axionite retarget
