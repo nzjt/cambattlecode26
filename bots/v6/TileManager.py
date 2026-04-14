@@ -44,6 +44,7 @@ class TileManager:
         self.gunners: dict[Position, list] = {}
         self.gunner_covered_grid: list[list[bool]] = []
         self.gunner_covered: int = 0
+        self.enemy_core: Position | None = None
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -77,6 +78,7 @@ class TileManager:
         get_tile_builder_bot_id = c.get_tile_builder_bot_id
         get_team = c.get_team
         get_direction = c.get_direction
+        get_marker_value = c.get_marker_value
 
         my_id = c.get_id()
         my_pos: Position = c.get_position(my_id)
@@ -224,9 +226,14 @@ class TileManager:
                         pass_grid[yi][xi] = 2
                     else:
                         pass_grid[yi][xi] = 0
+                        self.enemy_core = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = 1
+                    if self.enemy_core is None:
+                        if get_team(building_id) == my_team:
+                            value = get_marker_value(building_id)
+                            self.enemy_core = Position(value >> 6, value & 63)
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:

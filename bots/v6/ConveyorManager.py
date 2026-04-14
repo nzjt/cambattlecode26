@@ -503,6 +503,7 @@ class ConveyorManager:
 
             if keep_gunner:
                 if my_pos != self.path[self.index - 1]:
+                    movement.enrich(c)
                     self.nav.move(c, self.path[self.index - 1], movement)
 
                     if not c.get_move_cooldown():
@@ -700,6 +701,14 @@ class ConveyorManager:
                                 pass  # TODO
             else:
                 d: Direction = pos.direction_to(nxt)
+
+                enemy_core = tile_manager.enemy_core
+                if enemy_core is not None:
+                    if pos.distance_squared(enemy_core) <= 18:
+                        # Attack!
+                        need_gunner = True
+                        d = pos.direction_to(enemy_core)
+
                 if need_gunner:
                     pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
                     e: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)

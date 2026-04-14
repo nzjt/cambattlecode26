@@ -12,6 +12,7 @@ import consts as C
 import utils as U
 from BfsNav import BfsNav
 from Wander import Wander
+from CommunicationManager import CommunicationManager
 
 
 class BuilderBot(Unit):
@@ -41,6 +42,7 @@ class BuilderBot(Unit):
         self.routed_titanium: bool = False
         self.routed_axionite: bool = False
         self.is_axionite: bool = False
+        self.communication_manager: CommunicationManager = CommunicationManager()
 
         # if self.birth >= 100:
         #     if not FoundryManager.check_foundry(c):
@@ -124,7 +126,12 @@ class BuilderBot(Unit):
                             if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
                                 break
                     else:
-                        self.conveyor_manager = ConveyorManager(self.nav, self.home)
+                        enemy_core = self.tile_manager.enemy_core
+                        if enemy_core is not None and pos.distance_squared(enemy_core) <= pos.distance_squared(self.home):
+                            # Attack!
+                            self.conveyor_manager = ConveyorManager(self.nav, enemy_core)
+                        else:
+                            self.conveyor_manager = ConveyorManager(self.nav, self.home)
                         if self.is_axionite:
                             self.conveyor_manager.generate_path(c, self.tile_manager, pos, 2)
                             if not self.conveyor_manager.path:
@@ -331,6 +338,8 @@ class BuilderBot(Unit):
         super().run(c)
         my_pos = c.get_position()
         my_team = c.get_team()
+
+        self.communication_manager.update(c)
 
         U.can_afford = lambda building: not c.get_action_cooldown() and c.get_global_resources()[0] >= getattr(c, f"get_{building}_cost")()[0]
         # self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
@@ -646,5 +655,9 @@ class BuilderBot(Unit):
                                 if d != Direction.CENTRE:
                                     self.movement.move(d)
                                 break
+
+        if self.tile_manager.enemy_core is not None:
+            x, y = self.tile_manager.enemy_core
+            self.communication_manager.mark(y << 6 | x)
 
         self.prev_resources = c.get_global_resources()[0]
