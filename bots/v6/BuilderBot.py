@@ -350,10 +350,12 @@ class BuilderBot(Unit):
         self.tile_manager.sense(c, self.home, self.wander)
         self.bfs.update(c, self.conveyor_manager)
 
-        if self.tile_manager.axionite_ores and self.routed_titanium and not self.routed_axionite and self.target_type <= 2:
-            if self.birth == 1:
+        if self.birth == 1 and self.target_type <= 2:
+            if self.tile_manager.axionite_ores and self.routed_titanium and not self.routed_axionite:
                 self.target_type = 2
                 self.is_axionite = True
+            else:
+                self.is_axionite = False
 
         self.sense(c)
         self.movement.upd(c)
