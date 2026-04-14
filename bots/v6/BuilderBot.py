@@ -658,6 +658,6 @@ class BuilderBot(Unit):
 
         if self.tile_manager.enemy_core is not None:
             x, y = self.tile_manager.enemy_core
-            self.communication_manager.mark(y << 6 | x)
+            self.communication_manager.mark(x << 6 | y)
 
         self.prev_resources = c.get_global_resources()[0]
