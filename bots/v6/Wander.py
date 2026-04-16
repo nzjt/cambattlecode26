@@ -29,3 +29,7 @@ class Wander:
             for pos in self.unseen:
                 c.draw_indicator_dot(pos, 0, 255, 0)
             self.nav.multimove(c, list(self.unseen), self.movement, True)
+
+    def forget(self):
+        self.unseen |= self.seen
+        self.seen = set()

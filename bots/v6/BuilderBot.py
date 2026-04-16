@@ -43,6 +43,7 @@ class BuilderBot(Unit):
         self.routed_axionite: bool = False
         self.is_axionite: bool = False
         self.communication_manager: CommunicationManager = CommunicationManager()
+        self.must_patrol: bool = False
 
         # if self.birth >= 100:
         #     if not FoundryManager.check_foundry(c):
@@ -115,7 +116,7 @@ class BuilderBot(Unit):
                 if c.get_entity_type(c.get_tile_building_id(self.target)) in C.TURRET:
                     self.target_type = 0
 
-        if self.target_type <= 2 and not self.is_healer:
+        if self.target_type <= 2 and not self.is_healer and not self.must_patrol:
             e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
             for pos in c.get_nearby_tiles(2):
                 if c.get_tile_env(pos) == e_type and self.tile_manager.build_harvester[pos.y][pos.x]:
@@ -194,8 +195,8 @@ class BuilderBot(Unit):
         else:
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
+                building_id = c.get_tile_building_id(pos)
                 if env == Environment.ORE_TITANIUM and not self.is_healer:
-                    building_id = c.get_tile_building_id(pos)
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
                         dist = my_pos.distance_squared(pos)
                         xi, yi = pos
@@ -204,18 +205,18 @@ class BuilderBot(Unit):
                             for d in C.CARDINAL:
                                 nxt = pos.add(d)
                                 if U.on_the_map(nxt):
-                                    building_id = c.get_tile_building_id(nxt)
-                                    if building_id is None:
+                                    b_id = c.get_tile_building_id(nxt)
+                                    if b_id is None:
                                         has_space = c.get_tile_env(nxt) != Environment.WALL
-                                    elif c.get_team(building_id) == my_team:
-                                        e_type = c.get_entity_type(building_id)
+                                    elif c.get_team(b_id) == my_team:
+                                        e_type = c.get_entity_type(b_id)
                                         if e_type == EntityType.SENTINEL:
                                             has_enemy = False
                                             break
                                         else:
                                             has_space |= e_type in C.UNIMPORTANT
                                     else:
-                                        has_enemy |= c.get_entity_type(building_id) != EntityType.MARKER
+                                        has_enemy |= c.get_entity_type(b_id) != EntityType.MARKER
 
                             if has_space and has_enemy:
                                 self.target = pos
@@ -224,10 +225,10 @@ class BuilderBot(Unit):
 
                     if self.tile_manager.build_harvester[pos.y][pos.x]:
                         if self.target_type <= 2:
-                            building_id = c.get_tile_building_id(pos)
-                            e_type = c.get_entity_type(building_id)
+                            b_id = c.get_tile_building_id(pos)
+                            e_type = c.get_entity_type(b_id)
                             if e_type == EntityType.BARRIER:
-                                if self.is_troll or c.get_team(building_id) != my_team:
+                                if self.is_troll or c.get_team(b_id) != my_team:
                                     self.ores.discard(pos)
                                     continue
                             elif e_type == EntityType.HARVESTER:
@@ -241,14 +242,12 @@ class BuilderBot(Unit):
 
                             # TODO: also when >2
                             self.ores.add(pos)
-                            self.target_type = 2
                     else:
                         self.ores.discard(pos)
 
-                building_id = c.get_tile_building_id(pos)
                 e_type = c.get_entity_type(building_id)
                 if c.get_team(building_id) == my_team:
-                    if e_type not in C.UNIMPORTANT:
+                    if building_id is not None and e_type not in C.UNIMPORTANT:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             self.target = pos
                             self.target_type = 9
@@ -306,6 +305,16 @@ class BuilderBot(Unit):
                 #     self.conveyor_manager = None
                 #     break
 
+            if self.target_type < 2 and self.ores:
+                if not self.must_patrol:
+                    self.target_type = 2
+            if self.birth == 1 and self.target_type <= 2:
+                if self.tile_manager.axionite_ores and self.routed_titanium and not self.routed_axionite and not self.must_patrol:
+                    self.target_type = 2
+                    self.is_axionite = True
+                else:
+                    self.is_axionite = False
+
             if self.target_type == 2:
                 if self.is_axionite:
                     ores: set[Position] = self.tile_manager.axionite_ores
@@ -355,17 +364,17 @@ class BuilderBot(Unit):
                     self.is_axionite = False
                 else:
                     self.routed_titanium = True
+                self.must_patrol = True
+                self.wander.forget()
                 self.target_type = 0
 
         self.tile_manager.sense(c, self.home, self.wander)
         self.bfs.update(c, self.conveyor_manager)
 
-        if self.birth == 1 and self.target_type <= 2:
-            if self.tile_manager.axionite_ores and self.routed_titanium and not self.routed_axionite:
-                self.target_type = 2
-                self.is_axionite = True
-            else:
-                self.is_axionite = False
+        if self.target_type == 0:
+            if self.must_patrol:
+                if not self.wander.unseen:
+                    self.must_patrol = False
 
         self.sense(c)
         self.movement.upd(c)
@@ -401,7 +410,7 @@ class BuilderBot(Unit):
             return
 
         if self.target_type == 0:
-            if not self.is_healer:
+            if not self.is_healer and not self.must_patrol:
                 for _ in range(10):
                     self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
                     if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
@@ -475,9 +484,11 @@ class BuilderBot(Unit):
                 try_repair()
                 self.target_type = ~self.target_type
 
+        print(self.target_type, self.target)
         if self.target_type < 0:
             self.target_type = ~self.target_type
         elif self.target_type == 0:
+            print(self.target_type, self.target)
             self.wander.update(c)
         elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)

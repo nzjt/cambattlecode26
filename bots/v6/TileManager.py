@@ -337,6 +337,7 @@ class TileManager:
                     pos = pos.add(d)
                     if U.on_the_map(pos):
                         gunner_covered_grid[pos.y][pos.x] = True
+        print(dynamic_connectivity.count[14 * W + 2])
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")
