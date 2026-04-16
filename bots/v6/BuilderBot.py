@@ -115,6 +115,19 @@ class BuilderBot(Unit):
             if c.is_in_vision(self.target):
                 if c.get_entity_type(c.get_tile_building_id(self.target)) in C.TURRET:
                     self.target_type = 0
+        elif self.target_type == 9:
+            if c.is_in_vision(self.target):
+                building_id = c.get_tile_building_id(self.target)
+                max_hp: int = c.get_max_hp(building_id)
+                if c.get_hp(building_id) == max_hp:
+                    self.target_type = 0
+                else:
+                    if c.can_heal(self.target):
+                        c.heal(self.target)
+                        self.movement.act(c)
+
+                    if c.get_hp(building_id) == max_hp:
+                        self.target_type = 0
 
         if self.target_type <= 2 and not self.is_healer and not self.must_patrol:
             e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
@@ -285,18 +298,11 @@ class BuilderBot(Unit):
                                         building_id = c.get_tile_building_id(adj)
                                         if c.get_team(building_id) == my_team:
                                             e_type = c.get_entity_type(building_id)
-                                            if e_type == EntityType.BRIDGE:
-                                                if pos != c.get_bridge_target(building_id):
-                                                    continue
-                                            elif e_type in C.CONVEYOR_VARIANT:
-                                                if d != c.get_direction(building_id).opposite():
-                                                    continue
-                                            else:
-                                                continue
-                                            self.target = adj
-                                            self.sub_target = pos
-                                            self.target_type = 7
-                                            break
+                                            if e_type in C.CONVEYOR_VARIANT:
+                                                self.target = adj
+                                                self.sub_target = pos
+                                                self.target_type = 7
+                                                break
                 # if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
                 #     # Need to repair!
                 #     print("rep", pos)
@@ -488,7 +494,6 @@ class BuilderBot(Unit):
         if self.target_type < 0:
             self.target_type = ~self.target_type
         elif self.target_type == 0:
-            print(self.target_type, self.target)
             self.wander.update(c)
         elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
@@ -611,8 +616,17 @@ class BuilderBot(Unit):
         elif self.target_type == 7:
             c.draw_indicator_line(my_pos, self.target, 128, 255, 0)
             dist = my_pos.distance_squared(self.target)
-            if c.can_destroy(self.target):
-                c.destroy(self.target)
+            if c.is_in_vision(self.target):
+                building_id = c.get_tile_building_id(self.target)
+                e_type = c.get_entity_type(building_id)
+                if e_type == EntityType.BRIDGE:
+                    if self.sub_target == c.get_bridge_target(building_id):
+                        if c.can_destroy(self.target):
+                            c.destroy(self.target)
+                elif e_type in C.CONVEYOR_VARIANT:
+                    if self.sub_target == self.target.add(c.get_direction(building_id)):
+                        if c.can_destroy(self.target):
+                            c.destroy(self.target)
 
             if U.can_afford("gunner"):
                 if not dist:
@@ -625,25 +639,30 @@ class BuilderBot(Unit):
                                 break
 
                 if 1 <= dist <= 2:
-                    d: Direction = self.target.direction_to(self.sub_target)
-                    if c.can_build_gunner(self.target, d):
-                        c.build_gunner(self.target, d)
-                        self.target_type = 0
+                    bb_id = c.get_tile_builder_bot_id(self.target)
+                    if bb_id is None:
+                        if c.can_destroy(self.target):
+                            c.destroy(self.target)
+
+                        d: Direction = self.target.direction_to(self.sub_target)
+                        if c.can_build_gunner(self.target, d):
+                            c.build_gunner(self.target, d)
+                            self.target_type = 0
+                    if c.can_build_barrier(self.target):
+                        c.build_barrier(self.target)
+                    elif c.can_build_road(self.target):
+                        c.build_road(self.target)
 
             if self.target_type and dist:
                 self.nav.move(c, self.target, self.movement)
         elif self.target_type == 9:
             self.movement.enrich(c)
             if c.is_in_vision(self.target):
-                building_id = c.get_tile_building_id(self.target)
-                if c.get_hp(building_id) == c.get_max_hp(building_id):
-                    self.target_type = 0
-                else:
-                    if c.can_heal(self.target):
-                        c.heal(self.target)
-                    self.nav.move(c, self.target, self.movement)
-                    if c.can_heal(self.target):
-                        c.heal(self.target)
+                if c.can_heal(self.target):
+                    c.heal(self.target)
+                self.nav.move(c, self.target, self.movement)
+                if c.can_heal(self.target):
+                    c.heal(self.target)
             else:
                 self.nav.move(c, self.target, self.movement)
 
@@ -652,6 +671,29 @@ class BuilderBot(Unit):
             if c.get_hp() < c.get_max_hp() and self.target_type != 4 and c.can_heal(my_pos):
                 c.heal(my_pos)
                 self.movement.act(c)
+
+        if self.target_type != 4 and not c.get_action_cooldown():
+            directions = list(C.DIRECTIONS)
+            random.shuffle(directions)
+            candidate: Position | None = None
+            for d in directions:
+                pos: Position = my_pos.add(d)
+                bb_id: int = c.get_tile_builder_bot_id(pos)
+                if bb_id is None:
+                    building_id = c.get_tile_building_id(pos)
+                    if building_id is not None and c.get_team(building_id) == my_team:
+                        if c.get_hp(building_id) < c.get_max_hp(building_id) and c.can_heal(pos):
+                            candidate = pos
+                elif c.get_hp(bb_id) < c.get_max_hp(bb_id) and c.can_heal(pos):
+                    building_id = c.get_tile_building_id(pos)
+                    if c.get_team(building_id) == my_team:
+                        c.heal(pos)
+                        self.movement.act(c)
+                        break
+            else:
+                if candidate is not None:
+                    c.heal(candidate)
+                    self.movement.act(c)
 
         if self.target_type != 3 and not c.get_action_cooldown():
             my_pos = c.get_position()
