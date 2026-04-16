@@ -17,11 +17,16 @@ class CommunicationManager:
 
         directions: list[Position] = list(C.DIRECTIONS)
         random.shuffle(directions)
+        candidate: Position | None = None
         for d in directions:
             pos: Position = my_pos.add(d)
             if c.can_place_marker(pos):
                 building_id = c.get_tile_building_id(pos)
                 if c.get_entity_type(building_id) == EntityType.MARKER and c.get_team(building_id) == my_team:
+                    candidate = pos
                     continue
                 c.place_marker(pos, message)
                 return
+
+        if candidate is not None:
+            c.place_marker(candidate, message)

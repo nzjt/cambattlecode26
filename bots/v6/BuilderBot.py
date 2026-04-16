@@ -13,6 +13,7 @@ import utils as U
 from BfsNav import BfsNav
 from Wander import Wander
 from CommunicationManager import CommunicationManager
+from ExplorationManager import ExplorationManager
 
 
 class BuilderBot(Unit):
@@ -44,6 +45,7 @@ class BuilderBot(Unit):
         self.is_axionite: bool = False
         self.communication_manager: CommunicationManager = CommunicationManager()
         self.must_patrol: bool = False
+        self.exploration_manager: ExplorationManager = ExplorationManager()
 
         # if self.birth >= 100:
         #     if not FoundryManager.check_foundry(c):
@@ -417,12 +419,10 @@ class BuilderBot(Unit):
 
         if self.target_type == 0:
             if not self.is_healer and not self.must_patrol:
-                for _ in range(10):
-                    self.target = Position(random.randint(0, c.get_map_width() - 1), random.randint(0, c.get_map_height() - 1))
-                    if self.target != my_pos and self.tile_manager.pass_grid[self.target.y][self.target.x]:
-                        self.target_type = 1
-                        self.expiry = c.get_current_round() + 260
-                        break
+                self.target = self.exploration_manager.get_target(c, self.tile_manager)
+                if self.target is not None:
+                    self.target_type = 1
+                    self.expiry = c.get_current_round() + 260
 
         if self.target_type <= 2:
             for pos, info in self.tile_manager.gunners.items():
@@ -678,18 +678,19 @@ class BuilderBot(Unit):
             candidate: Position | None = None
             for d in directions:
                 pos: Position = my_pos.add(d)
-                bb_id: int = c.get_tile_builder_bot_id(pos)
-                if bb_id is None:
-                    building_id = c.get_tile_building_id(pos)
-                    if building_id is not None and c.get_team(building_id) == my_team:
-                        if c.get_hp(building_id) < c.get_max_hp(building_id) and c.can_heal(pos):
-                            candidate = pos
-                elif c.get_hp(bb_id) < c.get_max_hp(bb_id) and c.can_heal(pos):
-                    building_id = c.get_tile_building_id(pos)
-                    if c.get_team(building_id) == my_team:
-                        c.heal(pos)
-                        self.movement.act(c)
-                        break
+                if U.on_the_map(pos):
+                    bb_id: int = c.get_tile_builder_bot_id(pos)
+                    if bb_id is None:
+                        building_id = c.get_tile_building_id(pos)
+                        if building_id is not None and c.get_team(building_id) == my_team:
+                            if c.get_hp(building_id) < c.get_max_hp(building_id) and c.can_heal(pos):
+                                candidate = pos
+                    elif c.get_hp(bb_id) < c.get_max_hp(bb_id) and c.can_heal(pos):
+                        building_id = c.get_tile_building_id(pos)
+                        if c.get_team(building_id) == my_team:
+                            c.heal(pos)
+                            self.movement.act(c)
+                            break
             else:
                 if candidate is not None:
                     c.heal(candidate)
@@ -710,8 +711,6 @@ class BuilderBot(Unit):
                                     self.movement.move(d)
                                 break
 
-        if self.tile_manager.enemy_core is not None:
-            x, y = self.tile_manager.enemy_core
-            self.communication_manager.mark(x << 6 | y)
+        self.communication_manager.mark(self.tile_manager.symmetry)
 
         self.prev_resources = c.get_global_resources()[0]

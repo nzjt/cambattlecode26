@@ -47,6 +47,7 @@ class TileManager:
         self.gunner_covered: int = 0
         self.enemy_core: Position | None = None
         self.dynamic_connectivity: DynamicConnectivity = DynamicConnectivity()
+        self.symmetry: int = 7
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -140,6 +141,8 @@ class TileManager:
         gunners: dict[Position, list] = self.gunners
 
         dynamic_connectivity: DynamicConnectivity = self.dynamic_connectivity
+
+        symmetry: int = self.symmetry
 
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -255,8 +258,7 @@ class TileManager:
                     pass_grid[yi][xi] = 1
                     if self.enemy_core is None:
                         if get_team(building_id) == my_team:
-                            value = get_marker_value(building_id)
-                            self.enemy_core = Position(value >> 6, value & 63)
+                            symmetry &= get_marker_value(building_id)
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = 0
                     if get_team(building_id) == my_team:
@@ -328,6 +330,61 @@ class TileManager:
             else:
                 info[1] = True
 
+        self.symmetry = symmetry
+
+        if self.enemy_core is None:
+            enemy_core: Position | None = None
+            x, y = home
+            if symmetry & 1:
+                candidate: Position = Position(W - 1 - x, H - 1 - y)
+                pos = candidate.add(candidate.direction_to(my_pos))
+                if c.is_in_vision(pos):
+                    building_id = get_tile_building_id(pos)
+                    if c.get_team(building_id) == my_team or c.get_entity_type(building_id) != EntityType.CORE:
+                        symmetry &= 6
+
+                if symmetry & 1:
+                    enemy_core = candidate
+            if symmetry & 2:
+                candidate: Position = Position(W - 1 - x, y)
+                pos = candidate.add(candidate.direction_to(my_pos))
+                if c.is_in_vision(pos):
+                    building_id = get_tile_building_id(pos)
+                    if c.get_team(building_id) == my_team or c.get_entity_type(building_id) != EntityType.CORE:
+                        symmetry &= 5
+
+                if symmetry & 2:
+                    if enemy_core is None:
+                        enemy_core = candidate
+                    elif enemy_core != candidate:
+                        enemy_core = Position(0, 0)
+            if symmetry & 4:
+                candidate: Position = Position(x, H - 1 - y)
+                pos = candidate.add(candidate.direction_to(my_pos))
+                if c.is_in_vision(pos):
+                    building_id = get_tile_building_id(pos)
+                    if c.get_team(building_id) == my_team or c.get_entity_type(building_id) != EntityType.CORE:
+                        symmetry &= 3
+
+                if symmetry & 4:
+                    if enemy_core is None:
+                        enemy_core = candidate
+                    elif enemy_core != candidate:
+                        enemy_core = Position(0, 0)
+
+            if enemy_core is not None and enemy_core.x:
+                self.enemy_core = enemy_core
+        else:
+            x0, y0 = home
+            x1, y1 = self.enemy_core
+            if x0 + x1 != W - 1 or y0 + y1 != H - 1:
+                symmetry &= 6
+            if x0 != x1 or y0 + y1 != H - 1:
+                symmetry &= 5
+            if x0 + x1 != W - 1 or y0 != y1:
+                symmetry &= 3
+        self.symmetry = symmetry
+
         gunner_covered: int = 0
         gunner_covered_grid = self.gunner_covered_grid = [[False] * C.W for _ in range(C.H)]
         for pos, info in self.gunners.items():
@@ -337,7 +394,6 @@ class TileManager:
                     pos = pos.add(d)
                     if U.on_the_map(pos):
                         gunner_covered_grid[pos.y][pos.x] = True
-        print(dynamic_connectivity.count[14 * W + 2])
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")

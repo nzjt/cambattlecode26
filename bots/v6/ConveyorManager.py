@@ -573,6 +573,7 @@ class ConveyorManager:
         dist = my_pos.distance_squared(pos)
         if dist <= 2:
             if self.mode == 2 and self.index == len(self.path) - 2:
+                # TODO: what if conveyor is gone bruh
                 if self.splitter is None:
                     # TODO: fix
                     for d in C.CARDINAL:
