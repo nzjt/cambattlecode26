@@ -239,6 +239,7 @@ class BuilderBot(Unit):
                                 self.ores.discard(pos)
                                 continue
 
+                            # TODO: also when >2
                             self.ores.add(pos)
                             self.target_type = 2
                     else:

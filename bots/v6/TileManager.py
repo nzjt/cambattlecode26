@@ -2,6 +2,7 @@ from cambc import *
 import consts as C
 import utils as U
 from Wander import Wander
+from DynamicConnectivity import DynamicConnectivity
 
 
 class TileManager:
@@ -45,6 +46,7 @@ class TileManager:
         self.gunner_covered_grid: list[list[bool]] = []
         self.gunner_covered: int = 0
         self.enemy_core: Position | None = None
+        self.dynamic_connectivity: DynamicConnectivity = DynamicConnectivity()
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -98,10 +100,11 @@ class TileManager:
         env_grid, pass_grid = self.env_grid, self.pass_grid
         building_grid: list[list[tuple[EntityType, ...] | None]] = self.building_grid
         x, y = my_pos
+        W, H = C.W, C.H
         if x >= 4:
             shift = x - 4
             for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
-                if 0 <= yi < C.H:
+                if 0 <= yi < H:
                     mask = ~(mask << shift)
                     pass_bitset[yi] &= mask
                     buildable_bitset[yi] &= mask
@@ -110,14 +113,12 @@ class TileManager:
         else:
             shift = 4 - x
             for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
-                if 0 <= yi < C.H:
+                if 0 <= yi < H:
                     mask = ~(mask >> shift)
                     pass_bitset[yi] &= mask
                     buildable_bitset[yi] &= mask
                     barrier_bitset[yi] &= mask
                     has_building_bitset[yi] &= mask
-
-        # for yi in range(max(0, y - 4), min(C.H, y + 5)):
 
         ally, enemy = 0, 0
         ROAD = EntityType.ROAD
@@ -137,6 +138,8 @@ class TileManager:
         conveyors: set[Position] = self.conveyors
 
         gunners: dict[Position, list] = self.gunners
+
+        dynamic_connectivity: DynamicConnectivity = self.dynamic_connectivity
 
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -176,6 +179,18 @@ class TileManager:
                                                     has_space = True
                                     if not has_conveyor and has_space:
                                         self.build_harvester[yi][xi] = True
+                        i: int = y * W + x
+                        if i not in dynamic_connectivity.harvesters:
+                            for d in C.CARDINAL:
+                                cur: Position = pos.add(d)
+                                if U.is_visible(cur):
+                                    b_id = c.get_tile_building_id(cur)
+                                    if get_entity_type(b_id) in C.CONVEYOR_VARIANT and c.get_team(b_id) == my_team:
+                                        dynamic_connectivity.add_harvester(i)
+                                        xj, yj = cur
+                                        j: int = yj * W + xj
+                                        dynamic_connectivity.merge(i, j)
+                                        break
                 else:
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
@@ -208,9 +223,17 @@ class TileManager:
                         had_building_bitset[yi] |= 1 << xi
                         has_building_bitset[yi] |= 1 << xi
                         if e_type == EntityType.BRIDGE:
-                            building_grid[yi][xi] = (e_type, c.get_bridge_target(building_id))
+                            nxt: Position = c.get_bridge_target(building_id)
+                            building_grid[yi][xi] = (e_type, nxt)
                         else:
-                            building_grid[yi][xi] = (e_type, get_direction(building_id))
+                            d: Direction = get_direction(building_id)
+                            building_grid[yi][xi] = (e_type, d)
+                            nxt = pos.add(d)
+                        if U.on_the_map(nxt):
+                            i: int = yi * W + xi
+                            xj, yj = nxt
+                            j: int = yj * W + xj
+                            dynamic_connectivity.merge(i, j)
                         if my_pos.distance_squared(pos) <= 10:
                             wander_seen.add(pos)
                             wander_unseen.discard(pos)
