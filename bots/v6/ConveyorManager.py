@@ -757,9 +757,14 @@ class ConveyorManager:
                             def is_clear(cur: Position):
                                 if c.get_tile_env(cur) == Environment.EMPTY:
                                     building_id = c.get_tile_building_id(cur)
-                                    if building_id is None or c.get_entity_type(building_id) not in C.UNIMPORTANT:
-                                        self.path.insert(self.index + 1, cur)
-                                        return True
+                                    if c.get_team(building_id) == my_team:
+                                        if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
+                                            self.path.insert(self.index + 1, cur)
+                                            return True
+                                    else:
+                                        if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
+                                            self.path.insert(self.index + 1, cur)
+                                            return True
                                 return False
 
                             if dx and dy:
