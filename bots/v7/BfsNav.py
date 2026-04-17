@@ -12,19 +12,24 @@ class BfsNav(Nav):
         self.home: Position = home
         self.tile_manager: TileManager = tile_manager
 
-    def multimove(self, c: Controller, targets: list[Position] | int, movement: Movement, active: bool = False) -> None:
+    def multimove(self, c: Controller, targets: list[Position] | int, movement: Movement, **kwargs) -> None:
         W_plus_1: int = C.W + 1
         target: int = targets if isinstance(targets, int) else sum(
             1 << (y * W_plus_1 + x) for x, y in targets
         )
+        if kwargs.get("adj", False):
+            target |= target << 1 | target >> 1
+            target |= target << W_plus_1 | target >> W_plus_1
         not_unit: int = ~self.tile_manager["unit"]
 
         x, y = c.get_position()
         me: int = 1 << (y * W_plus_1 + x)
 
-        if target & me:
-            # Already at target
-            return
+        active: bool = kwargs.get("active", False)
+        if not active:
+            if target & me:
+                # Already at target
+                return
 
         adj = me | me << 1 | me >> 1
         adj |= adj << W_plus_1 | adj >> W_plus_1
@@ -107,6 +112,9 @@ class BfsNav(Nav):
 
         if target & not_unit & adj:
             move(target & not_unit & adj)
+            return
+
+        if (target & me) and active:
             return
 
         g: list[list[bool]] = [[p == 2 for p in row] for row in self.tile_manager.pass_grid]

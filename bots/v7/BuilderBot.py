@@ -13,6 +13,7 @@ from BfsNav import BfsNav
 from Wander import Wander
 from CommunicationManager import CommunicationManager
 from ExplorationManager import ExplorationManager
+from StalkerManager import StalkerManager
 
 
 class BuilderBot(Unit):
@@ -24,10 +25,10 @@ class BuilderBot(Unit):
         self.bfs = Bfs(self.home, self.tile_manager)
         self.nav: Nav = BfsNav(self.home, self.tile_manager)
         self.prev_resources = c.get_global_resources()[0]
-        self.is_healer = self.birth >= 4
         self.movement: Movement = Movement()
         self.wander: Wander = Wander(self.nav, self.movement)
         self.target: Position | None = None
+        self.targets: list[Position] = []
         self.sub_target: Position | None = None
         self.target_type: int = 0  # 0: nothing, 1: explore, 2: go to ore, 3: build conveyor home, 4: destroy enemy conveyors, 5: repair conveyor
         self.target_dist: int = 0
@@ -44,6 +45,7 @@ class BuilderBot(Unit):
         self.communication_manager: CommunicationManager = CommunicationManager()
         self.must_patrol: bool = False
         self.exploration_manager: ExplorationManager = ExplorationManager()
+        self.stalker_manager: StalkerManager = StalkerManager()
 
         target: Position = c.get_position()
         d: Direction = self.home.direction_to(target)
@@ -135,7 +137,7 @@ class BuilderBot(Unit):
                     if c.get_hp(building_id) == max_hp:
                         self.target_type = 0
 
-        if self.target_type <= 2 and not self.is_healer and not self.must_patrol:
+        if self.target_type <= 2 and not self.must_patrol:
             e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
             for pos in c.get_nearby_tiles(2):
                 if c.get_tile_env(pos) == e_type and self.tile_manager.build_harvester[pos.y][pos.x]:
@@ -163,7 +165,9 @@ class BuilderBot(Unit):
                         self.target_type = 3
                         break
 
-        if self.target_type == 6:
+        if self.target_type == 9:
+            pass
+        elif self.target_type == 7:
             pass
         elif self.target_type == 5:
             pass
@@ -212,12 +216,13 @@ class BuilderBot(Unit):
 
                 self.conveyor_manager.retarget(c, retargets, self.tile_manager, stuck)
         else:
+            self.targets = []
             for pos in c.get_nearby_tiles():
                 env: Environment = c.get_tile_env(pos)
                 building_id = c.get_tile_building_id(pos)
-                if env == Environment.ORE_TITANIUM and not self.is_healer:
+                dist = my_pos.distance_squared(pos)
+                if env == Environment.ORE_TITANIUM:
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
-                        dist = my_pos.distance_squared(pos)
                         xi, yi = pos
                         if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
                             has_space, has_enemy = False, False
@@ -309,6 +314,20 @@ class BuilderBot(Unit):
                                                 self.sub_target = pos
                                                 self.target_type = 7
                                                 break
+
+                if dist <= 10:
+                    bb_id = c.get_tile_builder_bot_id(pos)
+                    if c.get_team(bb_id) != my_team:
+                        for d in C.DIRECTIONS:
+                            cur = pos.add(d)
+                            if U.on_the_map(cur):
+                                cur_id = c.get_tile_builder_bot_id(cur)
+                                if cur_id is not None and c.get_team(cur_id) == my_team and cur_id != my_id:
+                                    if bb_id in self.stalker_manager.targets:
+                                        self.stalker_manager.targets.pop(bb_id)
+                                    break
+                        else:
+                            self.stalker_manager.targets[bb_id] = pos
                 # if pos.distance_squared(my_pos) <= 10 and needs_repair(pos):
                 #     # Need to repair!
                 #     print("rep", pos)
@@ -316,6 +335,14 @@ class BuilderBot(Unit):
                 #     self.target_type = 5
                 #     self.conveyor_manager = None
                 #     break
+
+            self.stalker_manager.cleanse(c)
+            if self.target_type <= 2:
+                if self.stalker_manager.targets:
+                    self.target_type = 6
+            elif self.target_type == 6:
+                if not self.stalker_manager.targets:
+                    self.target_type = 0
 
             if self.target_type < 2 and self.ores:
                 if not self.must_patrol:
@@ -422,7 +449,7 @@ class BuilderBot(Unit):
             return
 
         if self.target_type == 0:
-            if not self.is_healer and not self.must_patrol:
+            if not self.must_patrol:
                 self.target = self.exploration_manager.get_target(c, self.tile_manager)
                 if self.target is not None:
                     self.target_type = 1
@@ -613,10 +640,7 @@ class BuilderBot(Unit):
                         self.routed_titanium = True
                     self.target_type = 0
         elif self.target_type == 6:
-            self.foundry_manager.update(c, self.movement, self.tile_manager, self.bfs)
-
-            if self.foundry_manager.check_foundry(c) or c.get_current_round() >= self.foundry_manager.expiry and self.foundry_manager.target is None:
-                self.target_type = 0
+            self.stalker_manager.update(c, self.nav, self.movement)
         elif self.target_type == 7:
             c.draw_indicator_line(my_pos, self.target, 128, 255, 0)
             dist = my_pos.distance_squared(self.target)

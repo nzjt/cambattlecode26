@@ -28,7 +28,7 @@ class Wander:
                 self.unseen.remove(pos)
             for pos in self.unseen:
                 c.draw_indicator_dot(pos, 0, 255, 0)
-            self.nav.multimove(c, list(self.unseen), self.movement, True)
+            self.nav.multimove(c, list(self.unseen), self.movement, active=True)
 
     def forget(self):
         self.unseen |= self.seen
