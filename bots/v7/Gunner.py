@@ -25,7 +25,7 @@ class Gunner(Unit):
             target = my_pos
             for _ in range(3 if d in C.CARDINAL else 2):
                 target = target.add(d)
-                if U.on_the_map(target):
+                if U.on_the_map(target) and c.get_tile_env(target) != Environment.WALL:
                     bb_id = c.get_tile_builder_bot_id(target)
                     if bb_id is not None:
                         if c.get_team(bb_id) != my_team:
@@ -63,7 +63,7 @@ class Gunner(Unit):
         useful: bool = False
         for _ in range(3 if d in C.CARDINAL else 2):
             target = target.add(d)
-            if U.on_the_map(target):
+            if U.on_the_map(target) and c.get_tile_env(target) != Environment.WALL:
                 building_id = c.get_tile_building_id(target)
                 if building_id is not None and c.get_entity_type(building_id) != EntityType.MARKER:
                     useful = c.get_team(building_id) != my_team
@@ -76,7 +76,7 @@ class Gunner(Unit):
                 target = my_pos
                 for _ in range(3 if d in C.CARDINAL else 2):
                     target = target.add(d)
-                    if U.on_the_map(target):
+                    if U.on_the_map(target) and c.get_tile_env(target) != Environment.WALL:
                         building_id = c.get_tile_building_id(target)
                         if building_id is not None:
                             if c.get_team(building_id) == my_team:
