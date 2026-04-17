@@ -27,54 +27,121 @@ class ConveyorManager:
         self.conveyor: Position | None = None
 
     def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
+        W_plus_1 = C.W + 1
+        pass_: int = tile_manager["empty"]
         if avoid_joining:
-            a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 0)
-            g: list[list[int]] = a_star.g
+            pass_ &= ~tile_manager["conveyor"]
             if c.get_current_round() >= 100:
+                # TODO
                 x, y = self.home
-                env_grid = tile_manager.env_grid
-                if env_grid[y - 2][x + 2] == 3:
-                    g[y - 2][x + 2] = 1000000
-                if env_grid[y + 2][x + 2] == 3:
-                    g[y + 2][x + 2] = 1000000
-                if env_grid[y - 2][x - 2] == 3:
-                    g[y - 2][x - 2] = 1000000
-                if env_grid[y + 2][x - 2] == 3:
-                    g[y + 2][x - 2] = 1000000
+                # env_grid = tile_manager.env_grid
+                # if env_grid[y - 2][x + 2] == 3:
+                #     g[y - 2][x + 2] = 1000000
+                # if env_grid[y + 2][x + 2] == 3:
+                #     g[y + 2][x + 2] = 1000000
+                # if env_grid[y - 2][x - 2] == 3:
+                #     g[y - 2][x - 2] = 1000000
+                # if env_grid[y + 2][x - 2] == 3:
+                #     g[y + 2][x - 2] = 1000000
         else:
             self.mode = 1
-            a_star: AStarJPSOptimised = AStarJPSOptimised(tile_manager, 1)
-            g: list[list[int]] = a_star.g
 
-        # TODO: replace with BFS
+        # TODO
+        # if is_harvester:
+        #     my_team = c.get_team()
+        #     ban: list[tuple[int, int]] = []
+        #     for d in C.DIRECTIONS:
+        #         cur: Position = start.add(d)
+        #         if U.on_the_map(cur):
+        #             building_id = c.get_tile_building_id(cur)
+        #             if c.get_team(building_id) != my_team:
+        #                 if c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
+        #                     xi, yi = cur
+        #                     g[yi][xi] = -1
+        #                     ban.append((xi, yi))
+        #     x, y = start
+        #     blocked_N: bool = g[y - 1][x] == -1
+        #     blocked_E: bool = g[y][x + 1] == -1
+        #     blocked_S: bool = g[y + 1][x] == -1
+        #     blocked_W: bool = g[y][x - 1] == -1
+        #     if blocked_N and blocked_E:
+        #         g[y - 1][x + 1] = -1
+        #     if blocked_E and blocked_S:
+        #         g[y + 1][x + 1] = -1
+        #     if blocked_S and blocked_W:
+        #         g[y + 1][x - 1] = -1
+        #     if blocked_W and blocked_N:
+        #         g[y - 1][x - 1] = -1
+
+        x, y = start
+        bit: int = 1 << (y * W_plus_1 + x)
         if is_harvester:
-            my_team = c.get_team()
-            ban: list[tuple[int, int]] = []
-            for d in C.DIRECTIONS:
-                cur: Position = start.add(d)
-                if U.on_the_map(cur):
-                    building_id = c.get_tile_building_id(cur)
-                    if c.get_team(building_id) != my_team:
-                        if c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
-                            xi, yi = cur
-                            g[yi][xi] = -1
-                            ban.append((xi, yi))
-            x, y = start
-            blocked_N: bool = g[y - 1][x] == -1
-            blocked_E: bool = g[y][x + 1] == -1
-            blocked_S: bool = g[y + 1][x] == -1
-            blocked_W: bool = g[y][x - 1] == -1
-            if blocked_N and blocked_E:
-                g[y - 1][x + 1] = -1
-            if blocked_E and blocked_S:
-                g[y + 1][x + 1] = -1
-            if blocked_S and blocked_W:
-                g[y + 1][x - 1] = -1
-            if blocked_W and blocked_N:
-                g[y - 1][x - 1] = -1
+            adj: int = bit << 1 | bit >> 1 | bit << W_plus_1 | bit >> W_plus_1
+        else:
+            adj: int = bit
 
-        a_star.compute(start, [self.home], True)
-        return a_star.path
+        x, y = self.home
+        cur: int = 1 << (y * W_plus_1 + x)
+        cur |= cur << 1 | cur >> 1
+        cur |= cur << W_plus_1 | cur >> W_plus_1
+
+        if cur & adj:
+            return [start, start.add(start.direction_to(self.home))]
+
+        seen: list[int] = [cur]
+        while len(seen) < 100:
+            cur: int = seen[-1]
+            cur |= cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1
+
+            if len(seen) >= 2:
+                prev: int = seen[-2]
+                prev |= prev << 1 | prev >> 1
+                cur |= prev << W_plus_1 | prev >> W_plus_1
+
+            cur &= pass_
+
+            if cur & adj:
+                path: list[Position] = [start]
+                diagonal: bool = False
+                if is_harvester:
+                    seen.append(cur)
+                for cur in reversed(seen):
+                    if diagonal:
+                        if bit >> (W_plus_1 - 1) & cur:
+                            start = start.add(Direction.NORTHEAST)
+                            bit >>= W_plus_1 - 1
+                        elif bit << (W_plus_1 + 1) & cur:
+                            start = start.add(Direction.SOUTHEAST)
+                            bit <<= W_plus_1 + 1
+                        elif bit << (W_plus_1 - 1) & cur:
+                            start = start.add(Direction.SOUTHWEST)
+                            bit <<= W_plus_1 - 1
+                        elif bit >> (W_plus_1 + 1) & cur:
+                            start = start.add(Direction.NORTHWEST)
+                            bit >>= W_plus_1 + 1
+                        diagonal = False
+                    else:
+                        if bit >> W_plus_1 & cur:
+                            start = start.add(Direction.NORTH)
+                            bit >>= W_plus_1
+                        elif bit << 1 & cur:
+                            start = start.add(Direction.EAST)
+                            bit <<= 1
+                        elif bit << W_plus_1 & cur:
+                            start = start.add(Direction.SOUTH)
+                            bit <<= W_plus_1
+                        elif bit >> 1 & cur:
+                            start = start.add(Direction.WEST)
+                            bit >>= 1
+                        else:
+                            diagonal = True
+                            continue
+                    path.append(start)
+                return path
+
+            seen.append(cur)
+
+        return []
 
     def compute_to_conveyors(self, tile_manager: TileManager, start: Position):
         self.mode = 2
@@ -102,6 +169,8 @@ class ConveyorManager:
         if seen[0] & adj:
             return []
 
+        pass_ &= seen[0]
+
         while len(seen) < 100:
             cur: int = seen[-1]
             cur |= cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1
@@ -111,7 +180,7 @@ class ConveyorManager:
                 prev |= prev << 1 | prev >> 1
                 cur |= prev | prev << W_plus_1 | prev >> W_plus_1
             elif len(seen) == 1:
-                cur &= ~too_walled & ~seen[0]
+                cur &= ~too_walled
 
             cur &= pass_
             seen.append(cur)
@@ -233,7 +302,7 @@ class ConveyorManager:
 
                 self.index_path(c)
 
-    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, bfs: Bfs, repair: bool = False):
+    def update(self, c: Controller, movement: Movement, tile_manager: TileManager, nav: Nav, repair: bool = False):
         my_team = c.get_team()
         if c.is_in_vision(self.path[0]):
             building_id = c.get_tile_building_id(self.path[0])
@@ -279,15 +348,7 @@ class ConveyorManager:
                                 movement.act(c)
                         else:
                             if not enemy_near:
-                                if cur.distance_squared(my_pos) <= 2:
-                                    d: Direction = my_pos.direction_to(cur)
-                                    if not movement.can_move(d):
-                                        return False
-                                else:
-                                    d: Direction = bfs.bfs_to_pos(cur.x - my_pos.x, cur.y - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
-                                if d is not None:
-                                    if not c.get_move_cooldown():
-                                        movement.move(d)
+                                nav.move(c, cur, movement)
                             if c.can_fire(cur):
                                 c.fire(cur)
                                 movement.act(c)
@@ -527,10 +588,7 @@ class ConveyorManager:
                 if c.can_destroy(pos):
                     c.destroy(pos)
                 else:
-                    xi, yi = pos
-                    d: Direction = bfs.bfs_to_pos(xi - my_pos.x, yi - my_pos.y, tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy)
-                    if d is not None and d != Direction.CENTRE:
-                        movement.move(d)
+                    nav.move(c, pos, movement)
 
                     if c.can_destroy(pos):
                         c.destroy(pos)
@@ -606,7 +664,6 @@ class ConveyorManager:
                                         self.conveyor = cur
                                         break
 
-                        print(self.conveyor)
                         if self.conveyor is None:
                             return  # BRUH
 
@@ -688,9 +745,12 @@ class ConveyorManager:
 
                     if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_splitter_cost()[0]:
                         if c.get_position().distance_squared(self.splitter) <= 2:
+                            candidate: Direction | None = None
                             for d in C.CARDINAL:
                                 cur = self.splitter.add(d.opposite())
                                 if U.on_the_map(cur):
+                                    if cur == pos:
+                                        continue
                                     building_id = c.get_tile_building_id(cur)
                                     e_type = c.get_entity_type(building_id)
                                     if e_type in C.CONVEYOR:
@@ -698,9 +758,10 @@ class ConveyorManager:
                                             break
                                     elif e_type == EntityType.HARVESTER:
                                         break
-                                    elif e_type == EntityType.BRIDGE:
-                                        if c.get_bridge_target(building_id) == self.splitter:
-                                            break
+                                    candidate = d
+                            else:
+                                # TODO: what if None
+                                d = candidate
 
                             if c.can_destroy(self.splitter):
                                 c.destroy(self.splitter)
@@ -719,15 +780,7 @@ class ConveyorManager:
                         d = pos.direction_to(enemy_core)
 
                 if need_gunner:
-                    pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
-                    e: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-                    if e is None:
-                        movement.enrich(c)
-                        if movement.is_rich:
-                            e: Direction = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, (tile_manager.pass_ | tile_manager.buildable) & ~tile_manager.ally & ~tile_manager.enemy)
-
-                    if e is not None and e != Direction.CENTRE:
-                        movement.move(e)
+                    nav.move(c, pos, movement, active=True, exc=True)
 
                     if c.can_destroy(pos):
                         c.destroy(pos)
@@ -777,6 +830,10 @@ class ConveyorManager:
                                     d = C.DIRECTION_MAP[(0, dy)]
                                 else:
                                     if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                        while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
+                                            self.path.pop(self.index + 1)
+                                            nxt = self.path[self.index + 1]
+
                                         if c.can_destroy(pos):
                                             c.destroy(pos)
 
@@ -794,22 +851,10 @@ class ConveyorManager:
                         if do_build:
                             return
 
-                        pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
-                        d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-                        if d is None or d != Direction.CENTRE and not c.can_move(d):
-                            d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-
-                        if d is not None and d != Direction.CENTRE:
-                            movement.move(d)
+                        nav.move(c, pos, movement)
         elif not c.get_move_cooldown():
             # TODO: destroy launchers
             if do_build:
                 return
 
-            pass_: int = tile_manager.pass_ & ~tile_manager.ally & ~tile_manager.enemy
-            d: Direction = bfs.bfs_to_pos(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-            if d is None or d != Direction.CENTRE and not c.can_move(d):
-                d = bfs.bfs_adj_exc(pos.x - my_pos.x, pos.y - my_pos.y, pass_)
-
-            if d is not None and d != Direction.CENTRE:
-                movement.move(d)
+            nav.move(c, pos, movement)

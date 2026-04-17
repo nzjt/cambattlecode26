@@ -19,5 +19,4 @@ class StalkerManager:
             self.targets.pop(id_)
 
     def update(self, c: Controller, nav: Nav, movement: Movement):
-        print(self.targets)
         nav.multimove(c, list(self.targets.values()), movement, adj=True, active=True)

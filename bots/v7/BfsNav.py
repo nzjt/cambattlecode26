@@ -26,7 +26,8 @@ class BfsNav(Nav):
         me: int = 1 << (y * W_plus_1 + x)
 
         active: bool = kwargs.get("active", False)
-        if not active:
+        exc: bool = kwargs.get("exc", False)
+        if not active and not exc:
             if target & me:
                 # Already at target
                 return
@@ -114,7 +115,7 @@ class BfsNav(Nav):
             move(target & not_unit & adj)
             return
 
-        if (target & me) and active:
+        if (target & me) and not exc and active:
             return
 
         g: list[list[bool]] = [[p == 2 for p in row] for row in self.tile_manager.pass_grid]
