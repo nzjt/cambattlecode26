@@ -25,6 +25,7 @@ class ConveyorManager:
         self.home: Position = home
         self.splitter: Position | None = None
         self.conveyor: Position | None = None
+        self.prev_resource: int | None = None
 
     def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
         W_plus_1 = C.W + 1
@@ -545,32 +546,43 @@ class ConveyorManager:
             return
 
         building_id = c.get_tile_building_id(pos)
-        if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
-            keep_gunner: bool = False
-            di: Direction = c.get_direction(building_id)
-            cur: Position = pos
-            for _ in range(3 if di in C.CARDINAL else 2):
-                cur = cur.add(di)
-                if U.is_visible(cur):
-                    if c.get_tile_env(cur) == Environment.WALL:
-                        break
-                    else:
-                        b_id = c.get_tile_building_id(cur)
-                        if b_id is not None:
-                            e_type = c.get_entity_type(b_id)
-                            if c.get_team(b_id) == my_team:
-                                if e_type in C.UNIMPORTANT:
-                                    continue
-                            else:
-                                if e_type == EntityType.MARKER:
-                                    continue
-                                else:
-                                    keep_gunner = True
+        e_type: EntityType = c.get_entity_type(building_id)
+        if e_type in C.TURRET and c.get_team(building_id) == my_team:
+            if e_type == EntityType.GUNNER:
+                keep_turret: bool = False
+                di: Direction = c.get_direction(building_id)
+                cur: Position = pos
+                for _ in range(3 if di in C.CARDINAL else 2):
+                    cur = cur.add(di)
+                    if U.is_visible(cur):
+                        if c.get_tile_env(cur) == Environment.WALL:
                             break
+                        else:
+                            b_id = c.get_tile_building_id(cur)
+                            if b_id is not None:
+                                e_type = c.get_entity_type(b_id)
+                                if c.get_team(b_id) == my_team:
+                                    if e_type in C.UNIMPORTANT:
+                                        continue
+                                else:
+                                    if e_type == EntityType.MARKER:
+                                        continue
+                                    else:
+                                        keep_turret = True
+                                break
+                    else:
+                        break
+            else:
+                cur: Position = self.path[self.index - 1]
+                building_id = c.get_tile_building_id(cur)
+                resource: int | None = c.get_stored_resource_id(building_id)
+                if resource == self.prev_resource and resource is not None:
+                    keep_turret: bool = False
                 else:
-                    break
+                    keep_turret: bool = True
+                    self.prev_resource = resource
 
-            if keep_gunner:
+            if keep_turret:
                 if my_pos != self.path[self.index - 1]:
                     movement.enrich(c)
                     self.nav.move(c, self.path[self.index - 1], movement)
@@ -780,78 +792,109 @@ class ConveyorManager:
                         d = pos.direction_to(enemy_core)
 
                 if need_gunner:
-                    nav.move(c, pos, movement, active=True, exc=True)
-
-                    if c.can_destroy(pos):
-                        c.destroy(pos)
+                    nav.move(c, pos, movement, adj=True, exc=True)
 
                     if U.can_afford("gunner"):
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+
                         if c.can_build_gunner(pos, d):
                             c.build_gunner(pos, d)
                 else:
-                    if not c.get_move_cooldown() and not c.get_action_cooldown():
-                        dist = pos.distance_squared(self.home)
-                        if c.get_current_round() >= 100 and (dist == 13 or dist == 18):
-                            d: Direction = self.home.direction_to(pos)
-                            if dist == 17:
-                                dx, dy = d.delta()
-                                target: Position = Position(pos.x - dx * 3, pos.y - dy * 3)
-                            else:
-                                target: Position = self.home.add(d)
+                    # Try build sentinel
+                    # TODO: refine
+                    target: set[EntityType] = C.CONVEYOR_VARIANT | {EntityType.BARRIER, EntityType.HARVESTER}
+                    best_dir: Direction | None = None
+                    max_count: int = 0
+                    e: Direction = self.path[self.index - 1].direction_to(pos)
+                    for e in (e.rotate_left().rotate_left(), e.rotate_left(), e, e.rotate_right(), e.rotate_right().rotate_right()):
+                        count: int = 0
+                        for cur in c.get_attackable_tiles_from(pos, e, EntityType.SENTINEL):
+                            if c.is_in_vision(cur):
+                                building_id = c.get_tile_building_id(cur)
+                                if c.get_team(building_id) != my_team:
+                                    if c.get_entity_type(building_id) in target:
+                                        count += 1
+                        if count > max_count:
+                            best_dir = e
+                            max_count = count
 
-                            if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                if c.can_destroy(pos):
-                                    c.destroy(pos)
+                    if best_dir is not None:
+                        nav.move(c, pos, movement, adj=True, exc=True)
 
-                                c.build_bridge(pos, target)
-                                self.index = len(self.path) - 1
-                        else:
-                            dx, dy = d.delta()
+                        if U.can_afford("sentinel"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
 
-                            def is_clear(cur: Position):
-                                if c.get_tile_env(cur) == Environment.EMPTY:
-                                    building_id = c.get_tile_building_id(cur)
-                                    if c.get_team(building_id) == my_team:
-                                        if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
-                                            self.path.insert(self.index + 1, cur)
-                                            return True
-                                    else:
-                                        if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
-                                            self.path.insert(self.index + 1, cur)
-                                            return True
-                                return False
-
-                            if dx and dy:
-                                if is_clear(Position(pos.x + dx, pos.y)):
-                                    dy = 0
-                                    d = C.DIRECTION_MAP[(dx, 0)]
-                                elif is_clear(Position(pos.x, pos.y + dy)):
-                                    dx = 0
-                                    d = C.DIRECTION_MAP[(0, dy)]
+                            if c.can_build_sentinel(pos, best_dir):
+                                c.build_sentinel(pos, best_dir)
+                                cur: Position = self.path[self.index - 1]
+                                building_id = c.get_tile_building_id(cur)
+                                self.prev_resource = c.get_stored_resource_id(building_id)
+                    else:
+                        if not c.get_move_cooldown() and not c.get_action_cooldown():
+                            dist = pos.distance_squared(self.home)
+                            if c.get_current_round() >= 100 and (dist == 13 or dist == 18):
+                                d: Direction = self.home.direction_to(pos)
+                                if dist == 17:
+                                    dx, dy = d.delta()
+                                    target: Position = Position(pos.x - dx * 3, pos.y - dy * 3)
                                 else:
-                                    if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                        while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
-                                            self.path.pop(self.index + 1)
-                                            nxt = self.path[self.index + 1]
+                                    target: Position = self.home.add(d)
 
-                                        if c.can_destroy(pos):
-                                            c.destroy(pos)
-
-                                        c.build_bridge(pos, nxt)
-                                        self.index += 1
-
-                            if not dx or not dy:
-                                if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
+                                if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
                                     if c.can_destroy(pos):
                                         c.destroy(pos)
 
-                                    c.build_conveyor(pos, d)
-                                    self.index += 1
+                                    c.build_bridge(pos, target)
+                                    self.index = len(self.path) - 1
+                            else:
+                                dx, dy = d.delta()
 
-                        if do_build:
-                            return
+                                def is_clear(cur: Position):
+                                    if c.get_tile_env(cur) == Environment.EMPTY:
+                                        building_id = c.get_tile_building_id(cur)
+                                        if c.get_team(building_id) == my_team:
+                                            if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
+                                                self.path.insert(self.index + 1, cur)
+                                                return True
+                                        else:
+                                            if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
+                                                self.path.insert(self.index + 1, cur)
+                                                return True
+                                    return False
 
-                        nav.move(c, pos, movement)
+                                if dx and dy:
+                                    if is_clear(Position(pos.x + dx, pos.y)):
+                                        dy = 0
+                                        d = C.DIRECTION_MAP[(dx, 0)]
+                                    elif is_clear(Position(pos.x, pos.y + dy)):
+                                        dx = 0
+                                        d = C.DIRECTION_MAP[(0, dy)]
+                                    else:
+                                        if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                            while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
+                                                self.path.pop(self.index + 1)
+                                                nxt = self.path[self.index + 1]
+
+                                            if c.can_destroy(pos):
+                                                c.destroy(pos)
+
+                                            c.build_bridge(pos, nxt)
+                                            self.index += 1
+
+                                if not dx or not dy:
+                                    if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
+                                        if c.can_destroy(pos):
+                                            c.destroy(pos)
+
+                                        c.build_conveyor(pos, d)
+                                        self.index += 1
+
+                            if do_build:
+                                return
+
+                            nav.move(c, pos, movement)
         elif not c.get_move_cooldown():
             # TODO: destroy launchers
             if do_build:

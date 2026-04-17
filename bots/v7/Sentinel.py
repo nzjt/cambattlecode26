@@ -24,16 +24,26 @@ class Sentinel(Unit):
             e_type = c.get_entity_type(e_id)
             pos = c.get_position(e_id)
             if e_type == EntityType.HARVESTER:
-                if c.get_tile_env(pos) == Environment.ORE_TITANIUM:
+                env: Environment = c.get_tile_env(pos)
+                if env == Environment.ORE_TITANIUM:
                     for d in C.CARDINAL:
                         nxt = pos.add(d)
                         if U.on_the_map(nxt) and c.can_fire(nxt):
                             building_id = c.get_tile_building_id(nxt)
                             if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) != my_team:
-                                if score < 7:
+                                if score < 9:
                                     best = nxt
-                                    score = 7
+                                    score = 9
                                     break
+                    if c.can_fire(pos):
+                        if score < 7:
+                            best = pos
+                            score = 7
+                elif env == Environment.ORE_AXIONITE:
+                    if c.can_fire(pos):
+                        if score < 6:
+                            best = pos
+                            score = 6
             else:
                 if c.get_team(e_id) == my_team:
                     continue
@@ -52,9 +62,9 @@ class Sentinel(Unit):
                             best = pos
                             score = 1
                     elif e_type in C.TURRET:
-                        if score < 6:
+                        if score < 8:
                             best = pos
-                            score = 6
+                            score = 8
                     elif e_type == EntityType.BUILDER_BOT:
                         building_id = c.get_tile_building_id(pos)
                         if building_id is None or c.get_team(building_id) != my_team or c.get_entity_type(building_id) in C.UNIMPORTANT:

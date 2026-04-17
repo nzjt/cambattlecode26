@@ -18,16 +18,21 @@ class BfsNav(Nav):
             1 << (y * W_plus_1 + x) for x, y in targets
         )
         if kwargs.get("adj", False):
-            target |= target << 1 | target >> 1
-            target |= target << W_plus_1 | target >> W_plus_1
+            if kwargs.get("exc", False):
+                centre: int = target
+                target |= target << 1 | target >> 1
+                target |= target << W_plus_1 | target >> W_plus_1
+                target &= ~centre
+            else:
+                target |= target << 1 | target >> 1
+                target |= target << W_plus_1 | target >> W_plus_1
         not_unit: int = ~self.tile_manager["unit"]
 
         x, y = c.get_position()
         me: int = 1 << (y * W_plus_1 + x)
 
         active: bool = kwargs.get("active", False)
-        exc: bool = kwargs.get("exc", False)
-        if not active and not exc:
+        if not active:
             if target & me:
                 # Already at target
                 return
@@ -115,7 +120,7 @@ class BfsNav(Nav):
             move(target & not_unit & adj)
             return
 
-        if (target & me) and not exc and active:
+        if (target & me) and active:
             return
 
         g: list[list[bool]] = [[p == 2 for p in row] for row in self.tile_manager.pass_grid]
