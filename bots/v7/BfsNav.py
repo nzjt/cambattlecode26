@@ -53,7 +53,7 @@ class BfsNav(Nav):
                 if adj & (me >> (W_plus_1 + 1)):
                     if movement.can_move(Direction.NORTHWEST):
                         options.append(Direction.NORTHWEST)
-                if adj & (me >> W_plus_1 - 1):
+                if adj & (me >> (W_plus_1 - 1)):
                     if movement.can_move(Direction.NORTHEAST):
                         options.append(Direction.NORTHEAST)
                 if adj & (me << (W_plus_1 - 1)):
@@ -73,7 +73,7 @@ class BfsNav(Nav):
                 if adj & (me >> (W_plus_1 + 1)):
                     if movement.can_move(Direction.NORTHWEST):
                         options.append(Direction.NORTHWEST)
-                if adj & (me >> W_plus_1 - 1):
+                if adj & (me >> (W_plus_1 - 1)):
                     if movement.can_move(Direction.NORTHEAST):
                         options.append(Direction.NORTHEAST)
                 if adj & (me << (W_plus_1 - 1)):
