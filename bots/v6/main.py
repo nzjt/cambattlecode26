@@ -31,7 +31,8 @@ class Player:
             gc.disable()
 
             if self.unit is None:
-                random.seed(c.get_id())
+                x, y = c.get_position()
+                random.seed(c.get_current_round() << 20 | c.get_id() << 12 | x << 6 | y)
                 my_type = c.get_entity_type(c.get_id())
                 self.unit = Player.CLASS[my_type](c)
             try:
@@ -46,5 +47,6 @@ class Player:
                 f"\033[1;33mCaused by bot {c.get_id()} at {c.get_position()}, round {c.get_current_round()}\033[0m",
                 file=sys.stderr
             )
-            c.resign(f"{c.get_id()}@{c.get_position()}@{c.get_current_round()}: {self.death_msg}")
-            c.self_destruct()
+            # c.resign(f"{c.get_id()}@{c.get_position()}@{c.get_current_round()}: {self.death_msg}")
+            if self.death_msg != "TLE!":
+                c.self_destruct()
