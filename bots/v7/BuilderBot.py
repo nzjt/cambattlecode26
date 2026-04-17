@@ -394,8 +394,9 @@ class BuilderBot(Unit):
         # self.is_troll = 3 <= self.birth <= 4 and c.get_current_round() <= 300
 
         if self.target_type == 1:
-            if self.target.distance_squared(self.tile_manager.enemy_core) <= 2:
-                if my_pos.distance_squared(self.tile_manager.enemy_core) <= 8:
+            enemy_core: Position | None = self.tile_manager.enemy_core
+            if enemy_core is not None and self.target.distance_squared(enemy_core) <= 2:
+                if my_pos.distance_squared(enemy_core) <= 8:
                     self.target_type = 0
                     self.must_see_enemy_core = False
             else:
