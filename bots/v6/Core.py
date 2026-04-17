@@ -1,6 +1,10 @@
+from random import random
+
 from cambc import *
 from Unit import Unit
 from SpawnManager import SpawnManager
+import consts as C
+import random
 
 
 class Core(Unit):
@@ -9,6 +13,11 @@ class Core(Unit):
         self.tracker: dict[Position, int] = {}
         self.has_tried_foundry: bool = False
         self.spawn_manager = SpawnManager()
+
+        my_pos = c.get_position()
+        directions: list[Direction] = list(C.DIRECTIONS)
+        random.shuffle(directions)
+        self.spawn_manager.queue = [my_pos.add(d) for d in directions[:3]]
 
     def run(self, c: Controller):
         super().run(c)
@@ -45,7 +54,8 @@ class Core(Unit):
         #             self.has_tried_foundry = True
         #             c.spawn_builder(pos)
         #             break
-        elif c.get_global_resources()[0] >= 500 and c.get_global_resources()[0] * 2 >= c.get_scale_percent():
-            self.spawn_manager.spawn(c)
-        elif self.tracker and self.spawn_manager.spawned < 6:
-            self.spawn_manager.spawn(c)
+        elif self.tracker or c.get_current_round() >= 150:
+            if c.get_global_resources()[0] >= 300 and c.get_global_resources()[0] * 2.5 >= c.get_scale_percent():
+                self.spawn_manager.spawn(c)
+            elif self.tracker and self.spawn_manager.spawned < 6:
+                self.spawn_manager.spawn(c)

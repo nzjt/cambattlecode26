@@ -45,6 +45,12 @@ class BuilderBot(Unit):
         self.must_patrol: bool = False
         self.exploration_manager: ExplorationManager = ExplorationManager()
 
+        target: Position = c.get_position()
+        d: Direction = self.home.direction_to(target)
+        while U.on_the_map(target):
+            target = target.add(d)
+        self.exploration_manager.enqueue(target.add(d.opposite()))
+
         # if self.birth >= 100:
         #     if not FoundryManager.check_foundry(c):
         #         self.foundry_manager = FoundryManager(self.home, self.birth + 25)
