@@ -26,6 +26,7 @@ class TileManager:
         self.conveyor_bitset: list[int] = [0] * H
         self.had_building_bitset: list[int] = [0] * H
         self.has_building_bitset: list[int] = [0] * H
+        self.unit_bitset: list[int] = []
         self.building_grid: list[list[tuple[EntityType, ...] | None]] = [[None] * W for _ in range(H)]
         self.ally: int = 0
         self.enemy: int = 0
@@ -92,16 +93,17 @@ class TileManager:
             if c.get_entity_type(building_id) == EntityType.GUNNER and c.get_team(building_id) == my_team:
                 self.see_gun = True
 
+        W, H = C.W, C.H
         pass_bitset, buildable_bitset, ore_bitset, barrier_bitset = self.pass_bitset, self.buildable_bitset, self.ore_bitset, self.barrier_bitset
         empty_bitset: list[int] = self.empty_bitset
         titanium_bitset: list[int] = self.titanium_bitset
         conveyor_bitset: list[int] = self.conveyor_bitset
         had_building_bitset: list[int] = self.had_building_bitset
         has_building_bitset: list[int] = self.has_building_bitset
+        unit_bitset = self.unit_bitset = [0] * H
         env_grid, pass_grid = self.env_grid, self.pass_grid
         building_grid: list[list[tuple[EntityType, ...] | None]] = self.building_grid
         x, y = my_pos
-        W, H = C.W, C.H
         if x >= 4:
             shift = x - 4
             for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
@@ -274,6 +276,7 @@ class TileManager:
 
             bb_id = get_tile_builder_bot_id(pos)
             if bb_id is not None:
+                unit_bitset[yi] |= 1 << xi
                 team = c.get_team(bb_id)
                 dx = xi - my_pos.x
                 dy = yi - my_pos.y

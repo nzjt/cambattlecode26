@@ -7,7 +7,6 @@ from ConveyorManager import ConveyorManager
 from TileManager import TileManager
 from Bfs import Bfs
 from FoundryManager import FoundryManager
-from AStarNav import AStarNav
 import consts as C
 import utils as U
 from BfsNav import BfsNav
@@ -23,8 +22,7 @@ class BuilderBot(Unit):
         self.home = c.get_position(c.get_tile_building_id(c.get_position()))
         self.tile_manager = TileManager(self.home)
         self.bfs = Bfs(self.home, self.tile_manager)
-        self.nav: Nav = AStarNav(self.tile_manager, self.bfs)
-        self.bfs_nav: BfsNav = BfsNav(self.home, self.tile_manager)
+        self.nav: Nav = BfsNav(self.home, self.tile_manager)
         self.prev_resources = c.get_global_resources()[0]
         self.is_healer = self.birth >= 4
         self.movement: Movement = Movement()
@@ -485,7 +483,7 @@ class BuilderBot(Unit):
             buildable: int = self.tile_manager["buildable"]
             repair: int = (had_building ^ has_building) & buildable
             if repair:
-                self.bfs_nav.multimove(c, repair, self.movement)
+                self.nav.multimove(c, repair, self.movement)
                 my_pos = c.get_position()
                 try_repair()
                 self.target_type = ~self.target_type
