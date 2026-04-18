@@ -44,18 +44,6 @@ class ConveyorManager:
         pass_: int = tile_manager["empty"]
         if avoid_joining:
             pass_ &= ~tile_manager["conveyor"]
-            if c.get_current_round() >= 100:
-                x, y = self.home
-                if y >= 2:
-                    if x >= 2:
-                        pass_ |= 1 << ((y - 2) * W_plus_1 + x - 2)
-                    if x + 2 < C.W:
-                        pass_ |= 1 << ((y - 2) * W_plus_1 + x + 2)
-                if y + 2 < C.H:
-                    if x >= 2:
-                        pass_ |= 1 << ((y + 2) * W_plus_1 + x - 2)
-                    if x + 2 < C.W:
-                        pass_ |= 1 << ((y + 2) * W_plus_1 + x + 2)
         else:
             self.mode = 1
 
@@ -841,60 +829,44 @@ class ConveyorManager:
                                 self.prev_resource = c.get_stored_resource_id(building_id)
                     else:
                         if not c.get_move_cooldown() and not c.get_action_cooldown():
-                            dist = pos.distance_squared(self.home)
-                            if c.get_current_round() >= 100 and (dist == 13 or dist == 18):
-                                d: Direction = self.home.direction_to(pos)
-                                if dist == 17:
-                                    dx, dy = d.delta()
-                                    target: Position = Position(pos.x - dx * 3, pos.y - dy * 3)
-                                else:
-                                    target: Position = self.home.add(d)
+                            if pos.distance_squared(nxt) == 2:
+                                dx, dy = d.delta()
 
-                                if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                def is_clear(cur: Position):
+                                    if c.get_tile_env(cur) == Environment.EMPTY:
+                                        building_id = c.get_tile_building_id(cur)
+                                        nonlocal nxt
+                                        if c.get_team(building_id) == my_team:
+                                            if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
+                                                self.path.insert(self.index + 1, nxt := cur)
+                                                return True
+                                        else:
+                                            if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
+                                                self.path.insert(self.index + 1, nxt := cur)
+                                                return True
+                                    return False
+
+                                if is_clear(Position(pos.x + dx, pos.y)) or is_clear(Position(pos.x, pos.y + dy)):
+                                    d = pos.direction_to(nxt)
+
+                            if pos.distance_squared(nxt) == 1:
+                                if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
                                     if c.can_destroy(pos):
                                         c.destroy(pos)
 
-                                    c.build_bridge(pos, target)
-                                    self.index = len(self.path) - 1
+                                    c.build_conveyor(pos, d)
+                                    self.index += 1
                             else:
-                                if pos.distance_squared(nxt) == 2:
-                                    dx, dy = d.delta()
+                                if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                    while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
+                                        self.path.pop(self.index + 1)
+                                        nxt = self.path[self.index + 1]
 
-                                    def is_clear(cur: Position):
-                                        if c.get_tile_env(cur) == Environment.EMPTY:
-                                            building_id = c.get_tile_building_id(cur)
-                                            nonlocal nxt
-                                            if c.get_team(building_id) == my_team:
-                                                if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
-                                                    self.path.insert(self.index + 1, nxt := cur)
-                                                    return True
-                                            else:
-                                                if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
-                                                    self.path.insert(self.index + 1, nxt := cur)
-                                                    return True
-                                        return False
+                                    if c.can_destroy(pos):
+                                        c.destroy(pos)
 
-                                    if is_clear(Position(pos.x + dx, pos.y)) or is_clear(Position(pos.x, pos.y + dy)):
-                                        d = pos.direction_to(nxt)
-
-                                if pos.distance_squared(nxt) == 1:
-                                    if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
-                                        if c.can_destroy(pos):
-                                            c.destroy(pos)
-
-                                        c.build_conveyor(pos, d)
-                                        self.index += 1
-                                else:
-                                    if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                        while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
-                                            self.path.pop(self.index + 1)
-                                            nxt = self.path[self.index + 1]
-
-                                        if c.can_destroy(pos):
-                                            c.destroy(pos)
-
-                                        c.build_bridge(pos, nxt)
-                                        self.index += 1
+                                    c.build_bridge(pos, nxt)
+                                    self.index += 1
 
                             if do_build:
                                 return
