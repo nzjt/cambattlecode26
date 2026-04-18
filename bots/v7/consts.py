@@ -90,3 +90,4 @@ DIRECTION_MAP = {
 }
 W: int = 0
 H: int = 0
+MAP_MASK: int = 0

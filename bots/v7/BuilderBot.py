@@ -42,7 +42,7 @@ class BuilderBot(Unit):
         self.routed_axionite: bool = False
         self.is_axionite: bool = False
         self.communication_manager: CommunicationManager = CommunicationManager()
-        self.must_patrol: bool = False
+        self.must_patrol: bool = True
         self.exploration_manager: ExplorationManager = ExplorationManager()
         self.stalker_manager: StalkerManager = StalkerManager()
         self.must_see_enemy_core: bool = False

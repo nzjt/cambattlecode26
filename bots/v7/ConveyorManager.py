@@ -27,52 +27,37 @@ class ConveyorManager:
         self.conveyor: Position | None = None
         self.prev_resource: int | None = None
 
+    @staticmethod
+    def scaling(path: list[Position]):
+        scaling: int = 0
+        prev: Position = path[0]
+        for pos in path[1:]:
+            if prev.distance_squared(pos) == 1:
+                scaling += 1
+            else:
+                scaling += 10
+            prev = pos
+        return scaling
+
     def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
         W_plus_1 = C.W + 1
         pass_: int = tile_manager["empty"]
         if avoid_joining:
             pass_ &= ~tile_manager["conveyor"]
             if c.get_current_round() >= 100:
-                # TODO
                 x, y = self.home
-                # env_grid = tile_manager.env_grid
-                # if env_grid[y - 2][x + 2] == 3:
-                #     g[y - 2][x + 2] = 1000000
-                # if env_grid[y + 2][x + 2] == 3:
-                #     g[y + 2][x + 2] = 1000000
-                # if env_grid[y - 2][x - 2] == 3:
-                #     g[y - 2][x - 2] = 1000000
-                # if env_grid[y + 2][x - 2] == 3:
-                #     g[y + 2][x - 2] = 1000000
+                if y >= 2:
+                    if x >= 2:
+                        pass_ |= 1 << ((y - 2) * W_plus_1 + x - 2)
+                    if x + 2 < C.W:
+                        pass_ |= 1 << ((y - 2) * W_plus_1 + x + 2)
+                if y + 2 < C.H:
+                    if x >= 2:
+                        pass_ |= 1 << ((y + 2) * W_plus_1 + x - 2)
+                    if x + 2 < C.W:
+                        pass_ |= 1 << ((y + 2) * W_plus_1 + x + 2)
         else:
             self.mode = 1
-
-        # TODO
-        # if is_harvester:
-        #     my_team = c.get_team()
-        #     ban: list[tuple[int, int]] = []
-        #     for d in C.DIRECTIONS:
-        #         cur: Position = start.add(d)
-        #         if U.on_the_map(cur):
-        #             building_id = c.get_tile_building_id(cur)
-        #             if c.get_team(building_id) != my_team:
-        #                 if c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
-        #                     xi, yi = cur
-        #                     g[yi][xi] = -1
-        #                     ban.append((xi, yi))
-        #     x, y = start
-        #     blocked_N: bool = g[y - 1][x] == -1
-        #     blocked_E: bool = g[y][x + 1] == -1
-        #     blocked_S: bool = g[y + 1][x] == -1
-        #     blocked_W: bool = g[y][x - 1] == -1
-        #     if blocked_N and blocked_E:
-        #         g[y - 1][x + 1] = -1
-        #     if blocked_E and blocked_S:
-        #         g[y + 1][x + 1] = -1
-        #     if blocked_S and blocked_W:
-        #         g[y + 1][x - 1] = -1
-        #     if blocked_W and blocked_N:
-        #         g[y - 1][x - 1] = -1
 
         x, y = start
         bit: int = 1 << (y * W_plus_1 + x)
@@ -90,6 +75,7 @@ class ConveyorManager:
             return [start, start.add(start.direction_to(self.home))]
 
         seen: list[int] = [cur]
+        map_mask: int = C.MAP_MASK
         while len(seen) < 100:
             cur: int = seen[-1]
             cur |= cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1
@@ -98,45 +84,68 @@ class ConveyorManager:
                 prev: int = seen[-2]
                 prev |= prev << 1 | prev >> 1
                 cur |= prev << W_plus_1 | prev >> W_plus_1
+                if len(seen) >= 6:
+                    prev: int = seen[-6]
+                    prev |= prev << 1 | prev >> 1
+                    prev |= prev << W_plus_1 | prev >> W_plus_1
+                    prev &= map_mask
+                    prev |= prev << 1 | prev >> 1
+                    cur |= prev << W_plus_1 | prev >> W_plus_1
 
             cur &= pass_
 
             if cur & adj:
                 path: list[Position] = [start]
-                diagonal: bool = False
                 if is_harvester:
                     seen.append(cur)
-                for cur in reversed(seen):
-                    if diagonal:
+                i: int = len(seen)
+                while i:
+                    cur: int = seen[i - 1]
+                    if bit >> W_plus_1 & cur:
+                        start = start.add(Direction.NORTH)
+                        bit >>= W_plus_1
+                        i -= 1
+                    elif bit << 1 & cur:
+                        start = start.add(Direction.EAST)
+                        bit <<= 1
+                        i -= 1
+                    elif bit << W_plus_1 & cur:
+                        start = start.add(Direction.SOUTH)
+                        bit <<= W_plus_1
+                        i -= 1
+                    elif bit >> 1 & cur:
+                        start = start.add(Direction.WEST)
+                        bit >>= 1
+                        i -= 1
+                    else:
+                        cur: int = seen[i - 2]
                         if bit >> (W_plus_1 - 1) & cur:
                             start = start.add(Direction.NORTHEAST)
                             bit >>= W_plus_1 - 1
+                            i -= 2
                         elif bit << (W_plus_1 + 1) & cur:
                             start = start.add(Direction.SOUTHEAST)
                             bit <<= W_plus_1 + 1
+                            i -= 2
                         elif bit << (W_plus_1 - 1) & cur:
                             start = start.add(Direction.SOUTHWEST)
                             bit <<= W_plus_1 - 1
+                            i -= 2
                         elif bit >> (W_plus_1 + 1) & cur:
                             start = start.add(Direction.NORTHWEST)
                             bit >>= W_plus_1 + 1
-                        diagonal = False
-                    else:
-                        if bit >> W_plus_1 & cur:
-                            start = start.add(Direction.NORTH)
-                            bit >>= W_plus_1
-                        elif bit << 1 & cur:
-                            start = start.add(Direction.EAST)
-                            bit <<= 1
-                        elif bit << W_plus_1 & cur:
-                            start = start.add(Direction.SOUTH)
-                            bit <<= W_plus_1
-                        elif bit >> 1 & cur:
-                            start = start.add(Direction.WEST)
-                            bit >>= 1
+                            i -= 2
                         else:
-                            diagonal = True
-                            continue
+                            cur: int = seen[i - 6]
+                            mask = bit | bit << 1 | bit >> 1
+                            mask |= mask << W_plus_1 | mask >> W_plus_1
+                            mask &= map_mask
+                            mask |= mask << 1 | mask >> 1
+                            mask |= mask << W_plus_1 | mask >> W_plus_1
+                            index: int = (mask & cur).bit_length() - 1
+                            start = Position(index % W_plus_1, index // W_plus_1)
+                            bit = 1 << index
+                            i -= 6
                     path.append(start)
                 return path
 
@@ -231,7 +240,7 @@ class ConveyorManager:
         else:
             path = self.compute_to_conveyors(tile_manager, start)
         if path:
-            path = self.path = U.normalise_on_grid(path, tile_manager.env_grid)
+            self.path = path
             self.index_path(c)
 
             for i in range(1, len(path)):
@@ -249,8 +258,7 @@ class ConveyorManager:
         if self.mode == 0:
             path = self.compute(c, tile_manager, self.path[self.index], True, False)
             if path:
-                path = U.normalise_on_grid(path, tile_manager.env_grid)
-                if len(path) < len(self.path) - self.index:
+                if ConveyorManager.scaling(path) < ConveyorManager.scaling(self.path[self.index:]) or stuck:
                     self.path = self.path[:self.index] + path
                     self.index_path(c)
                     for i in range(1, len(path)):
@@ -290,7 +298,6 @@ class ConveyorManager:
                 return
 
             suffix: list[Position] = [Position(x + dx, y + dy) for dx, dy in raw_path]
-            suffix = U.normalise_on_grid(suffix, tile_manager.env_grid)
             if len(suffix) < len(self.path) - self.index:
                 while self.path[self.index] != suffix[0]:
                     self.index -= 1
@@ -850,46 +857,43 @@ class ConveyorManager:
                                     c.build_bridge(pos, target)
                                     self.index = len(self.path) - 1
                             else:
-                                dx, dy = d.delta()
+                                if pos.distance_squared(nxt) == 2:
+                                    dx, dy = d.delta()
 
-                                def is_clear(cur: Position):
-                                    if c.get_tile_env(cur) == Environment.EMPTY:
-                                        building_id = c.get_tile_building_id(cur)
-                                        if c.get_team(building_id) == my_team:
-                                            if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
-                                                self.path.insert(self.index + 1, cur)
-                                                return True
-                                        else:
-                                            if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
-                                                self.path.insert(self.index + 1, cur)
-                                                return True
-                                    return False
+                                    def is_clear(cur: Position):
+                                        if c.get_tile_env(cur) == Environment.EMPTY:
+                                            building_id = c.get_tile_building_id(cur)
+                                            nonlocal nxt
+                                            if c.get_team(building_id) == my_team:
+                                                if building_id is None or (e_type := c.get_entity_type(building_id)) in C.UNIMPORTANT or e_type == EntityType.BARRIER:
+                                                    self.path.insert(self.index + 1, nxt := cur)
+                                                    return True
+                                            else:
+                                                if (e_type := c.get_entity_type(building_id)) in C.DESTROY_ENEMY or e_type == EntityType.MARKER:
+                                                    self.path.insert(self.index + 1, nxt := cur)
+                                                    return True
+                                        return False
 
-                                if dx and dy:
-                                    if is_clear(Position(pos.x + dx, pos.y)):
-                                        dy = 0
-                                        d = C.DIRECTION_MAP[(dx, 0)]
-                                    elif is_clear(Position(pos.x, pos.y + dy)):
-                                        dx = 0
-                                        d = C.DIRECTION_MAP[(0, dy)]
-                                    else:
-                                        if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                            while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
-                                                self.path.pop(self.index + 1)
-                                                nxt = self.path[self.index + 1]
+                                    if is_clear(Position(pos.x + dx, pos.y)) or is_clear(Position(pos.x, pos.y + dy)):
+                                        d = pos.direction_to(nxt)
 
-                                            if c.can_destroy(pos):
-                                                c.destroy(pos)
-
-                                            c.build_bridge(pos, nxt)
-                                            self.index += 1
-
-                                if not dx or not dy:
+                                if pos.distance_squared(nxt) == 1:
                                     if c.get_global_resources()[0] >= c.get_conveyor_cost()[0]:
                                         if c.can_destroy(pos):
                                             c.destroy(pos)
 
                                         c.build_conveyor(pos, d)
+                                        self.index += 1
+                                else:
+                                    if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
+                                        while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
+                                            self.path.pop(self.index + 1)
+                                            nxt = self.path[self.index + 1]
+
+                                        if c.can_destroy(pos):
+                                            c.destroy(pos)
+
+                                        c.build_bridge(pos, nxt)
                                         self.index += 1
 
                             if do_build:
