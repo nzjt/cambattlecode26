@@ -94,7 +94,7 @@ class BuilderBot(Unit):
                 if c.get_team(building_id) != my_team and c.get_entity_type(building_id) == EntityType.HARVESTER:
                     has_space, has_enemy = False, False
                     for d in C.CARDINAL:
-                        nxt = self.target.add(d)
+                        nxt: Position = self.target.add(d)
                         if U.on_the_map(nxt):
                             building_id = c.get_tile_building_id(nxt)
                             if building_id is None:
@@ -133,9 +133,9 @@ class BuilderBot(Unit):
                         self.target_type = 0
 
         if self.target_type <= 2 and not self.must_patrol and not self.must_see_enemy_core:
-            e_type = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
+            env: Environment = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
             for pos in c.get_nearby_tiles(2):
-                if c.get_tile_env(pos) == e_type and self.tile_manager.build_harvester[pos.y][pos.x]:
+                if c.get_tile_env(pos) == env and self.tile_manager.build_harvester[pos.y][pos.x]:
                     for d in Direction:
                         cur = pos.add(d)
                         if U.is_visible(cur):
@@ -173,43 +173,47 @@ class BuilderBot(Unit):
                 retargets: list[Position] = []
                 stuck: bool = False
                 path_index = self.conveyor_manager.path_index
+                W, H = C.W, C.H
+                nxt: list[int] = [-1] * (W * H)
+                good: list[bool | None] = [None] * (W * H + 1)
+                good[-1] = False
                 for pos in c.get_nearby_tiles():
                     building_id = c.get_tile_building_id(pos)
-                    if c.get_entity_type(building_id) in C.MONOCHILD_CONVEYOR and c.get_team(building_id) == my_team:
-                        xi, yi = pos
-                        cur_index = path_index[yi][xi]
-                        if cur_index >= self.conveyor_manager.index:
-                            if cur_index == self.conveyor_manager.index:
-                                self.conveyor_manager.avoid_joining = False
-                            stuck |= cur_index < 1000000
-                            good = True
-                            cur = pos
-                            for _ in range(10):
-                                building_id = c.get_tile_building_id(cur)
-                                if building_id is None or c.get_team(building_id) != my_team:
-                                    good = False
-                                    break
-                                e_type = c.get_entity_type(building_id)
-                                if e_type in C.CONVEYOR:
-                                    cur = cur.add(c.get_direction(building_id))
-                                elif e_type == EntityType.BRIDGE:
-                                    cur = c.get_bridge_target(building_id)
+                    e_type: EntityType = c.get_entity_type(building_id)
+                    if c.get_team(building_id) == my_team:
+                        if e_type in C.MONOCHILD_CONVEYOR:
+                            xi, yi = pos
+                            if e_type == EntityType.BRIDGE:
+                                target: Position = c.get_bridge_target(building_id)
+                            else:
+                                target: Position = pos.add(c.get_direction(building_id))
+
+                            cur_index = path_index[yi][xi]
+                            if cur_index >= self.conveyor_manager.index:
+                                if cur_index == self.conveyor_manager.index:
+                                    self.conveyor_manager.avoid_joining = False
+                                stuck |= cur_index < 1000000
+                                if U.on_the_map(target):
+                                    if c.is_in_vision(target):
+                                        xj, yj = target
+                                        nxt[yi * W + xi] = yj * W + xj
+                                    else:
+                                        good[yi * W + xi] = True
+                                    retargets.append(pos)
                                 else:
-                                    good = e_type == EntityType.CORE
-                                    break
+                                    good[yi * W + xi] = False
+                            else:
+                                good[yi * W + xi] = False
+                        elif e_type == EntityType.CORE:
+                            xi, yi = pos
+                            good[yi * W + xi] = True
 
-                                if c.is_in_vision(cur):
-                                    if self.conveyor_manager.path_index[cur.y][cur.x] < self.conveyor_manager.index:
-                                        good = False
-                                        break
-                                else:
-                                    # Probably fine?
-                                    break
+                def is_good(i: int):
+                    if (g := good[i]) is None:
+                        g = good[i] = is_good(nxt[i])
+                    return g
 
-                            if good:
-                                retargets.append(pos)
-
-                self.conveyor_manager.retarget(c, retargets, self.tile_manager, stuck)
+                self.conveyor_manager.retarget(c, [pos for pos in retargets if is_good(pos.y * W + pos.x)], self.tile_manager, stuck)
         else:
             targets: dict[int, Position] = self.stalker_manager.targets
             enemy_core: Position | None = self.tile_manager.enemy_core
@@ -415,7 +419,7 @@ class BuilderBot(Unit):
 
         self.tile_manager.sense(c, self.home, self.wander)
         self.bfs.update(c, self.conveyor_manager)
-
+        print(c.get_cpu_time_elapsed())
         if self.target_type == 0:
             if self.must_patrol:
                 if not self.wander.unseen:
@@ -423,7 +427,7 @@ class BuilderBot(Unit):
 
         self.sense(c)
         self.movement.upd(c)
-
+        print(c.get_cpu_time_elapsed())
         if self.target_type == 1:
             if not self.tile_manager.pass_grid[self.target.y][self.target.x]:
                 self.target_type = 0
@@ -519,7 +523,7 @@ class BuilderBot(Unit):
                 my_pos = c.get_position()
                 try_repair()
                 self.target_type = ~self.target_type
-
+        print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)
         if self.target_type < 0:
             self.target_type = ~self.target_type
@@ -563,7 +567,7 @@ class BuilderBot(Unit):
                         self.nav.multimove(c, list(self.ores), self.movement)
         elif self.target_type == 3:
             if not self.conveyor_manager.path:
-                if c.get_cpu_time_elapsed() <= 600:
+                if c.get_cpu_time_elapsed() <= 1200:
                     self.conveyor_manager.generate_path(c, self.tile_manager, self.target, 1)
                     if not self.conveyor_manager.path:
                         if self.conveyor_manager.home == self.tile_manager.enemy_core:
@@ -581,6 +585,7 @@ class BuilderBot(Unit):
                 if not self.conveyor_manager.index:
                     self.tile_manager.ban_harvester[self.target.y][self.target.x] = True
                     self.target_type = 0
+            print(c.get_cpu_time_elapsed())
         elif self.target_type == 4:
             sentinel_targets: list[Position] = []
             for d in C.CARDINAL:
