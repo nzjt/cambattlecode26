@@ -167,7 +167,7 @@ class ConveyorManager:
         if seen[0] & adj:
             return []
 
-        pass_ &= seen[0]
+        pass_ &= ~seen[0]
 
         while len(seen) < 100:
             cur: int = seen[-1]
