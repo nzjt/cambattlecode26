@@ -765,7 +765,7 @@ class ConveyorManager:
                                             break
                                     elif e_type == EntityType.HARVESTER:
                                         break
-                                    candidate = d
+                                    candidate = d.opposite()
                             else:
                                 # TODO: what if None
                                 d = candidate
