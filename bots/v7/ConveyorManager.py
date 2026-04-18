@@ -229,12 +229,12 @@ class ConveyorManager:
             path = self.compute_to_conveyors(tile_manager, start)
         if path:
             self.path = path
-            self.index_path(c)
+            self.index_path()
 
             for i in range(1, len(path)):
                 c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
 
-    def index_path(self, c: Controller):
+    def index_path(self):
         path: list[Position] = self.path
         W_plus_1: int = C.W + 1
         path_index = self.path_index = [[1000000] * W_plus_1 for _ in range(C.H + 1)]
@@ -248,7 +248,7 @@ class ConveyorManager:
             if path:
                 if ConveyorManager.scaling(path) < ConveyorManager.scaling(self.path[self.index:]) or stuck:
                     self.path = self.path[:self.index] + path
-                    self.index_path(c)
+                    self.index_path()
                     for i in range(1, len(path)):
                         c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
                     return
@@ -296,7 +296,7 @@ class ConveyorManager:
                 for i in range(1, len(self.path)):
                     c.draw_indicator_line(self.path[i - 1], self.path[i], 255, 255, 0)
 
-                self.index_path(c)
+                self.index_path()
 
     def update(self, c: Controller, movement: Movement, tile_manager: TileManager, nav: Nav, repair: bool = False):
         my_team = c.get_team()
@@ -867,6 +867,8 @@ class ConveyorManager:
 
                                     c.build_bridge(pos, nxt)
                                     self.index += 1
+
+                                    self.index_path()
 
                             if do_build:
                                 return
