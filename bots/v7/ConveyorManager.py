@@ -427,12 +427,13 @@ class ConveyorManager:
                             return
 
                         d: Direction = my_pos.direction_to(self.path[0])
-                        if not c.get_move_cooldown() and (c.can_move(d) or c.get_global_resources()[0] >= c.get_road_cost()[0]):
+                        if not c.get_move_cooldown() and (c.can_move(d) or U.can_afford("road")):
                             bb_id = c.get_tile_builder_bot_id(self.path[0])
                             if bb_id is None:
                                 if c.get_entity_type(building_id) != EntityType.ROAD:
                                     if c.can_destroy(self.path[0]):
                                         c.destroy(self.path[0])
+                                        c.build_road(self.path[0])
                                 movement.enrich(c)
                                 movement.move(d)
                                 on_ore = True
@@ -725,10 +726,11 @@ class ConveyorManager:
         if self.mode == 3 and self.index == len(self.path) - 2:
             for d in C.CARDINAL:
                 cur: Position = nxt.add(d)
-                b_id = c.get_tile_building_id(cur)
-                if c.get_team(b_id) != my_team and c.get_entity_type(b_id) not in C.UNIMPORTANT:
-                    need_gunner = True
-                    break
+                if U.is_visible(cur):
+                    b_id = c.get_tile_building_id(cur)
+                    if c.get_team(b_id) != my_team and c.get_entity_type(b_id) not in C.UNIMPORTANT:
+                        need_gunner = True
+                        break
 
         dist = my_pos.distance_squared(pos)
         if dist <= 2:

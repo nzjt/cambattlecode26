@@ -309,6 +309,8 @@ class BuilderBot(Unit):
                                         continue
                                     adj: Position = nxt.add(e)
                                     if U.is_visible(adj):
+                                        if e == d and c.get_tile_env(nxt) == Environment.WALL:
+                                            continue
                                         building_id = c.get_tile_building_id(adj)
                                         if c.get_team(building_id) == my_team:
                                             e_type = c.get_entity_type(building_id)
