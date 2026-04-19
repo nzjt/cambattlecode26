@@ -49,6 +49,7 @@ class Movement:
 
     def move_raw(self, d: Direction):
         self.c.move(d)
+        self.can_move = lambda d: False
 
     def move_rich(self, d: Direction):
         c: Controller = self.c
