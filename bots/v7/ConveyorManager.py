@@ -896,21 +896,21 @@ class ConveyorManager:
                     # Try build sentinel
                     # TODO: refine
                     best_dir: Direction | None = None
-                    if self.index >= 2 and self.mode <= 1:
-                        target: set[EntityType] = C.CONVEYOR_VARIANT | {EntityType.BARRIER, EntityType.HARVESTER}
-                        max_count: int = 0
-                        e: Direction = self.path[self.index - 1].direction_to(pos)
-                        for e in (e.rotate_left().rotate_left(), e.rotate_left(), e, e.rotate_right(), e.rotate_right().rotate_right()):
-                            count: int = 0
-                            for cur in c.get_attackable_tiles_from(pos, e, EntityType.SENTINEL):
-                                if c.is_in_vision(cur):
-                                    building_id = c.get_tile_building_id(cur)
-                                    if c.get_team(building_id) != my_team:
-                                        if c.get_entity_type(building_id) in target:
-                                            count += 1
-                            if count > max_count:
-                                best_dir = e
-                                max_count = count
+                    # if self.index >= 2 and self.mode <= 1:
+                    #     target: set[EntityType] = C.CONVEYOR_VARIANT | {EntityType.BARRIER, EntityType.HARVESTER}
+                    #     max_count: int = 0
+                    #     e: Direction = self.path[self.index - 1].direction_to(pos)
+                    #     for e in (e.rotate_left().rotate_left(), e.rotate_left(), e, e.rotate_right(), e.rotate_right().rotate_right()):
+                    #         count: int = 0
+                    #         for cur in c.get_attackable_tiles_from(pos, e, EntityType.SENTINEL):
+                    #             if c.is_in_vision(cur):
+                    #                 building_id = c.get_tile_building_id(cur)
+                    #                 if c.get_team(building_id) != my_team:
+                    #                     if c.get_entity_type(building_id) in target:
+                    #                         count += 1
+                    #         if count > max_count:
+                    #             best_dir = e
+                    #             max_count = count
 
                     if best_dir is not None:
                         nav.move(c, pos, movement, adj=True, exc=True)
