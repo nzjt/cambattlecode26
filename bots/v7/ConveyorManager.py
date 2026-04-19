@@ -621,27 +621,35 @@ class ConveyorManager:
             if e_type == EntityType.GUNNER:
                 keep_turret: bool = False
                 di: Direction = c.get_direction(building_id)
-                cur: Position = pos
-                for _ in range(3 if di in C.CARDINAL else 2):
-                    cur = cur.add(di)
-                    if U.is_visible(cur):
-                        if c.get_tile_env(cur) == Environment.WALL:
+                for d in C.DIRECTIONS:
+                    cur: Position = pos.add(d)
+                    if c.is_in_vision(cur):
+                        b_id = c.get_tile_building_id(cur)
+                        if c.get_team(b_id) != my_team and c.get_entity_type(b_id) not in C.UNIMPORTANT:
+                            keep_turret = True
                             break
-                        else:
-                            b_id = c.get_tile_building_id(cur)
-                            if b_id is not None:
-                                e_type = c.get_entity_type(b_id)
-                                if c.get_team(b_id) == my_team:
-                                    if e_type in C.UNIMPORTANT:
-                                        continue
-                                else:
-                                    if e_type == EntityType.MARKER:
-                                        continue
-                                    else:
-                                        keep_turret = True
+                else:
+                    cur: Position = pos
+                    for _ in range(3 if di in C.CARDINAL else 2):
+                        cur = cur.add(di)
+                        if U.is_visible(cur):
+                            if c.get_tile_env(cur) == Environment.WALL:
                                 break
-                    else:
-                        break
+                            else:
+                                b_id = c.get_tile_building_id(cur)
+                                if b_id is not None:
+                                    e_type = c.get_entity_type(b_id)
+                                    if c.get_team(b_id) == my_team:
+                                        if e_type in C.UNIMPORTANT:
+                                            continue
+                                    else:
+                                        if e_type == EntityType.MARKER:
+                                            continue
+                                        else:
+                                            keep_turret = True
+                                    break
+                        else:
+                            break
             else:
                 cur: Position = self.path[self.index - 1]
                 building_id = c.get_tile_building_id(cur)
@@ -713,6 +721,14 @@ class ConveyorManager:
                 e_type = c.get_entity_type(building_id)
                 need_gunner &= c.get_team(building_id) != my_team and e_type not in C.DESTROY_ENEMY and e_type != EntityType.MARKER
         nxt = self.path[self.index + 1]
+
+        if self.mode == 3 and self.index == len(self.path) - 2:
+            for d in C.CARDINAL:
+                cur: Position = nxt.add(d)
+                b_id = c.get_tile_building_id(cur)
+                if c.get_team(b_id) != my_team and c.get_entity_type(b_id) not in C.UNIMPORTANT:
+                    need_gunner = True
+                    break
 
         dist = my_pos.distance_squared(pos)
         if dist <= 2:
