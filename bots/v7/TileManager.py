@@ -52,6 +52,9 @@ class TileManager:
         self.my_ores: set[Position] = set()
         self.enemy_ores: set[Position] = set()
 
+        x, y = home
+        self.reach: int = 1 << (y * (W + 1) + x)
+
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
         if x >= 4:
@@ -409,6 +412,15 @@ class TileManager:
                     pos = pos.add(d)
                     if U.on_the_map(pos):
                         gunner_covered_grid[pos.y][pos.x] = True
+
+        empty: int = self["empty"]
+        reach: int = self.reach
+        W_plus_1: int = C.W + 1
+        for _ in range(50):
+            reach |= reach << 1 | reach >> 1
+            reach |= reach << W_plus_1 | reach >> W_plus_1
+            reach &= empty
+        self.reach = reach
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")

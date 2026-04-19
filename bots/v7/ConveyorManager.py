@@ -41,7 +41,7 @@ class ConveyorManager:
 
     def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
         W_plus_1 = C.W + 1
-        pass_: int = tile_manager["empty"]
+        pass_: int = tile_manager.reach
         if avoid_joining:
             pass_ &= ~tile_manager["conveyor"]
         else:
@@ -143,7 +143,7 @@ class ConveyorManager:
 
     def compute_to_conveyors(self, tile_manager: TileManager, start: Position) -> list[Position]:
         W_plus_1: int = C.W + 1
-        pass_: int = tile_manager["empty"]
+        pass_: int = tile_manager.reach
 
         # Can't be adj to two walls
         wall_N: int = ~(pass_ << W_plus_1)
@@ -234,7 +234,7 @@ class ConveyorManager:
             return []
 
         conveyor: int = tile_manager["conveyor"]
-        pass_: int = tile_manager["empty"] & ~conveyor
+        pass_: int = tile_manager.reach & ~conveyor
 
         target: int = (my_ores << 1 | my_ores >> 1 | my_ores << W_plus_1 | my_ores >> W_plus_1) & pass_
         seen: list[int] = [enemy_ores]
