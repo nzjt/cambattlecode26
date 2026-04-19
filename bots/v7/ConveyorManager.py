@@ -525,7 +525,7 @@ class ConveyorManager:
                         # d: Direction = self.path[0].add(C.CARDINAL[i]).direction_to(self.path[0].add(C.CARDINAL[i - 1]))
                         # if abs()
                         j = i - 1
-                    elif mine[i + 1]:
+                    elif mine[(i + 1) % 4]:
                         j = (i + 1) % 4
                     else:
                         continue
