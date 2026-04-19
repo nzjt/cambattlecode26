@@ -16,7 +16,7 @@ class ConveyorManager:
     }
 
     def __init__(self, nav: Nav, home: Position):
-        self.mode: int = 0  # 0: avoid joining, 1: normal, 2: axionite
+        self.mode: int = 0  # 0: avoid joining, 1: normal, 2: axionite, 3: destroy enemy
         self.path_index: list[list[bool]] | None = None
         self.path = []
         self.index = 1
@@ -141,9 +141,7 @@ class ConveyorManager:
 
         return []
 
-    def compute_to_conveyors(self, tile_manager: TileManager, start: Position):
-        self.mode = 2
-
+    def compute_to_conveyors(self, tile_manager: TileManager, start: Position) -> list[Position]:
         W_plus_1: int = C.W + 1
         pass_: int = tile_manager["empty"]
 
@@ -222,17 +220,77 @@ class ConveyorManager:
 
         return []
 
+    def compute_to_enemy(self, tile_manager: TileManager) -> list[Position]:
+        W_plus_1: int = C.W + 1
+
+        my_ores: int = sum(
+            1 << (y * W_plus_1 + x) for x, y in tile_manager.my_ores
+        )
+        enemy_ores: int = sum(
+            1 << (y * W_plus_1 + x) for x, y in tile_manager.enemy_ores
+        )
+
+        if not my_ores or not enemy_ores:
+            return []
+
+        conveyor: int = tile_manager["conveyor"]
+        pass_: int = tile_manager["empty"] & ~conveyor
+
+        target: int = (my_ores << 1 | my_ores >> 1 | my_ores << W_plus_1 | my_ores >> W_plus_1) & pass_
+        seen: list[int] = [enemy_ores]
+
+        for i in range(100):
+            cur: int = seen[-1]
+            cur |= cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1
+
+            if i >= 2:
+                prev: int = seen[-2]
+                prev |= prev << 1 | prev >> 1
+                cur |= prev | prev << W_plus_1 | prev >> W_plus_1
+
+            cur &= pass_
+            seen.append(cur)
+
+            if cur & target:
+                index: int = ((cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1) & my_ores).bit_length() - 1
+                path: list[Position] = [Position(index % W_plus_1, index // W_plus_1)]
+                i: int = len(seen)
+                while i:
+                    bit = 1 << index
+                    intersection: int = (bit << 1 | bit >> 1 | bit << W_plus_1 | bit >> W_plus_1) & seen[i - 1]
+                    if intersection:
+                        index: int = intersection.bit_length() - 1
+                        path.append(Position(index % W_plus_1, index // W_plus_1))
+                        i -= 1
+                    else:
+                        bit |= bit << 1 | bit >> 1
+                        bit |= bit << W_plus_1 | bit >> W_plus_1
+                        intersection: int = bit & seen[i - 2]
+                        # Must have
+                        index: int = intersection.bit_length() - 1
+                        path.append(Position(index % W_plus_1, index // W_plus_1))
+                        i -= 2
+                return path
+
+        return []
+
     def generate_path(self, c: Controller, tile_manager: TileManager, start: Position, mode: int = 0):
         if mode <= 1:
             path = self.compute(c, tile_manager, start, not mode)
-        else:
+        elif mode == 2:
             path = self.compute_to_conveyors(tile_manager, start)
+            self.mode = 2
+        else:
+            path = self.compute_to_enemy(tile_manager)
+            self.mode = 3
         if path:
             self.path = path
             self.index_path()
 
             for i in range(1, len(path)):
                 c.draw_indicator_line(path[i - 1], path[i], 255, 0, 255)
+            # if self.mode == 3:
+            #     c.resign()
 
     def index_path(self):
         path: list[Position] = self.path
@@ -531,6 +589,23 @@ class ConveyorManager:
                     d: Direction = my_pos.direction_to(self.path[0])
                     if movement.can_move(d):
                         movement.move(d)
+            elif self.mode == 3:
+                end: Position = self.path[-1]
+                if c.is_in_vision(end):
+                    building_id = c.get_tile_building_id(end)
+                    if c.get_entity_type(building_id) == EntityType.BARRIER and c.get_team(building_id) == my_team:
+                        self.done = True
+                        return
+
+                if U.can_afford("barrier"):
+                    self.nav.move(c, end, movement, adj=True, exc=True)
+                else:
+                    self.nav.move(c, end, movement)
+
+                # TODO: fire
+                if c.can_build_barrier(end):
+                    c.build_barrier(end)
+                    self.done = True
             else:
                 self.done = not on_ore
             return
@@ -592,6 +667,10 @@ class ConveyorManager:
                                 movement.move(random.choice(options))
                 return
             else:
+                if self.mode == 3:
+                    if c.can_build_barrier(self.path[-1]):
+                        c.build_barrier(self.path[-1])
+
                 if c.can_destroy(pos):
                     c.destroy(pos)
                 else:
@@ -627,7 +706,7 @@ class ConveyorManager:
                 return
             pos = self.path[self.index]
         else:
-            nxt = self.path[self.index + 1]
+            nxt: Position = self.path[self.index + 1]
             need_gunner = c.is_in_vision(nxt)
             if need_gunner:
                 building_id = c.get_tile_building_id(nxt)
@@ -799,7 +878,7 @@ class ConveyorManager:
                     # Try build sentinel
                     # TODO: refine
                     best_dir: Direction | None = None
-                    if self.index >= 2:
+                    if self.index >= 2 and self.mode <= 1:
                         target: set[EntityType] = C.CONVEYOR_VARIANT | {EntityType.BARRIER, EntityType.HARVESTER}
                         max_count: int = 0
                         e: Direction = self.path[self.index - 1].direction_to(pos)
@@ -858,9 +937,10 @@ class ConveyorManager:
                                     self.index += 1
                             else:
                                 if c.get_global_resources()[0] >= c.get_bridge_cost()[0]:
-                                    while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
-                                        self.path.pop(self.index + 1)
-                                        nxt = self.path[self.index + 1]
+                                    if self.mode <= 2:
+                                        while self.index + 2 < len(self.path) and self.path[self.index + 2].distance_squared(pos) <= 9:
+                                            self.path.pop(self.index + 1)
+                                            nxt = self.path[self.index + 1]
 
                                     if c.can_destroy(pos):
                                         c.destroy(pos)

@@ -49,6 +49,8 @@ class TileManager:
         self.enemy_core: Position | None = None
         self.dynamic_connectivity: DynamicConnectivity = DynamicConnectivity()
         self.symmetry: int = 7
+        self.my_ores: set[Position] = set()
+        self.enemy_ores: set[Position] = set()
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -146,6 +148,9 @@ class TileManager:
 
         symmetry: int = self.symmetry
 
+        my_ores: set[Position] = self.my_ores
+        enemy_ores: set[Position] = self.enemy_ores
+
         for pos in c.get_nearby_tiles():
             xi, yi = pos
 
@@ -158,11 +163,14 @@ class TileManager:
                 ore_bitset[yi] |= 1 << xi
                 if env == 4:
                     titanium_bitset[yi] |= 1 << xi
+                    is_mine: bool = True
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
                     elif building_id is not None:
                         e_type = get_entity_type(building_id)
                         if e_type == EntityType.HARVESTER:
+                            if get_team(building_id) != my_team:
+                                is_mine = False
                             self.build_harvester[yi][xi] = False
                             if pos.distance_squared(my_pos) <= 13:
                                 if pos.distance_squared(home) > 5:
@@ -196,6 +204,10 @@ class TileManager:
                                         j: int = yj * W + xj
                                         dynamic_connectivity.merge(i, j)
                                         break
+                        if is_mine:
+                            my_ores.add(pos)
+                        else:
+                            enemy_ores.add(pos)
                 else:
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False

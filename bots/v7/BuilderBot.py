@@ -159,8 +159,11 @@ class BuilderBot(Unit):
                         self.target = pos
                         self.target_type = 3
                         break
+        # TODO: settlement vs los smth
 
         if self.target_type == 9:
+            pass
+        elif self.target_type == 8:
             pass
         elif self.target_type == 7:
             pass
@@ -387,6 +390,12 @@ class BuilderBot(Unit):
                 else:
                     self.target_type = 0
 
+            if self.target_type < 2:
+                self.conveyor_manager = ConveyorManager(self.nav, self.home)
+                self.conveyor_manager.generate_path(c, self.tile_manager, None, 3)
+                if self.conveyor_manager.path:
+                    self.target_type = 8
+
     def run(self, c: Controller):
         super().run(c)
         my_pos = c.get_position()
@@ -413,6 +422,11 @@ class BuilderBot(Unit):
                     self.is_axionite = False
                 else:
                     self.routed_titanium = True
+                self.must_patrol = True
+                self.wander.forget()
+                self.target_type = 0
+        elif self.target_type == 8:
+            if self.conveyor_manager.done:
                 self.must_patrol = True
                 self.wander.forget()
                 self.target_type = 0
@@ -694,6 +708,8 @@ class BuilderBot(Unit):
 
             if self.target_type and dist:
                 self.nav.move(c, self.target, self.movement)
+        elif self.target_type == 8:
+            self.conveyor_manager.update(c, self.movement, self.tile_manager, self.nav, False)
         elif self.target_type == 9:
             self.movement.enrich(c)
             if c.is_in_vision(self.target):
