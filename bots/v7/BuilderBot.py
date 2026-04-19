@@ -612,19 +612,8 @@ class BuilderBot(Unit):
                         if building_id is None or c.get_team(building_id) == my_team and c.get_entity_type(building_id) in C.UNIMPORTANT:
                             sentinel_targets.append(nxt)
 
-            x, y = my_pos
-            deltas = [(xi - x, yi - y) for xi, yi in sentinel_targets]
-            d: Direction = self.bfs.bfs_adj_exc_multi(deltas, self.tile_manager.pass_)
-
-            if d is None:
-                d = self.bfs.bfs_adj_exc_multi(deltas, self.tile_manager.pass_ | self.tile_manager.buildable)
-
-            if d is None:
-                # :(
-                pass
-            elif d != Direction.CENTRE and self.movement.can_move(d):
-                self.movement.move(d)
-                my_pos = c.get_position()
+            self.nav.multimove(c, sentinel_targets, self.movement, adj=True, exc=True, active=True)
+            my_pos = c.get_position()
             c.draw_indicator_line(my_pos, self.target, 255, 128, 0)
 
             if c.get_global_resources()[0] >= c.get_sentinel_cost()[0]:
@@ -766,6 +755,6 @@ class BuilderBot(Unit):
                                 self.nav.move(c, my_pos, self.movement, adj=True, exc=True, active=True)
                                 break
 
-        self.communication_manager.mark(self.tile_manager.symmetry)
+        self.communication_manager.mark(self.tile_manager.symmetry | self.target_type << 2)
 
         self.prev_resources = c.get_global_resources()[0]
