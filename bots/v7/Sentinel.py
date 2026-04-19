@@ -35,15 +35,17 @@ class Sentinel(Unit):
                                     best = nxt
                                     score = 9
                                     break
-                    if c.can_fire(pos):
-                        if score < 7:
-                            best = pos
-                            score = 7
+                    if c.get_team(building_id) != my_team:
+                        if c.can_fire(pos):
+                            if score < 7:
+                                best = pos
+                                score = 7
                 elif env == Environment.ORE_AXIONITE:
-                    if c.can_fire(pos):
-                        if score < 6:
-                            best = pos
-                            score = 6
+                    if c.get_team(building_id) != my_team:
+                        if c.can_fire(pos):
+                            if score < 6:
+                                best = pos
+                                score = 6
             else:
                 if c.get_team(e_id) == my_team:
                     continue
