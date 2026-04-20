@@ -22,6 +22,7 @@ class Network:
         self.adj: list[list[int]] = []
         self.orphans: list[int] = []
         self.childless: list[int] = []
+        self.bad: list[bool] = []
 
     def update(self):
         W: int = C.W
@@ -31,5 +32,16 @@ class Network:
             j: int = nxt[i]
             if j >= 0:
                 adj[j].append(i)
-        self.orphans = [i for i in range(W * C.H) if adj[i] and nxt[i] == -1]
+
+        bad = self.bad = [i < 0 for i in nxt]
+
+        def dfs(i: int):
+            if not bad[i]:
+                bad[i] = True
+                for j in adj[i]:
+                    dfs(j)
+
+        self.orphans = [i for i in range(W * C.H) if adj[i] and ((j := nxt[i]) == -1 or j >= 0 and nxt[j] == -3)]
+        for i in self.orphans:
+            dfs(i)
         self.childless = [i for i in range(W * C.H) if nxt[i] == -2]

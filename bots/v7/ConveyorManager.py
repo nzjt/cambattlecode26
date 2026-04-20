@@ -42,31 +42,44 @@ class ConveyorManager:
         return scaling
 
     @staticmethod
-    def build_from(c: Controller, tile_manager: TileManager, from_: int):
+    def get_edge(tile_manager: TileManager, from_: int):
+        W: int = C.W
+        to: int = sum(
+            1 << (index + index // W) for index in tile_manager.network.childless
+        )
+
+        edge: tuple = ConveyorManager.get_edge_to(tile_manager, from_, to)
+        if edge:
+            return edge
+
+        bad: list[bool] = tile_manager.network.bad
+        to: int = sum(
+            1 << (index + index // W) for index in range(W * C.H) if not bad[index]
+        )
+
+        return ConveyorManager.get_edge_to(tile_manager, from_, to)
+
+    @staticmethod
+    def get_edge_to(tile_manager: TileManager, from_: int, to: int) -> tuple:
         W: int = C.W
         W_plus_1: int = W + 1
         pass_: int = tile_manager.reach
         pass_ &= ~(tile_manager["conveyor"] | tile_manager["bridge"])
-
-        cur: int = sum(
-            1 << (index + index // W) for index in tile_manager.network.childless
+        pass_ |= sum(
+            1 << (y * W_plus_1 + x) for x, y in tile_manager.is_protection
         )
+
+        cur: int = to
 
         adj: int = from_ << 1 | from_ >> 1 | from_ << W_plus_1 | from_ >> W_plus_1
 
         if cur & adj:
             # TODO
-            i: int = from_.bit_length() - 1
+            i: int = (from_ & (adj << 1 | adj >> 1 | adj << W_plus_1 | adj >> W_plus_1)).bit_length() - 1
             pos: Position = Position(i % W_plus_1, i // W_plus_1)
-            i: int = (cur & adj).bit_length() - 1
-            nxt: Position = Position(i % W_plus_1, i // W_plus_1)
-            print(i, nxt)
-            d: Direction = pos.direction_to(nxt)
-            if c.can_destroy(pos):
-                c.destroy(pos)
-            if c.can_build_conveyor(pos, d):
-                c.build_conveyor(pos, d)
-            return
+            j: int = (cur & adj).bit_length() - 1
+            nxt: Position = Position(j % W_plus_1, j // W_plus_1)
+            return pos, nxt
 
         seen: list[int] = [cur]
         while len(seen) < 100:
@@ -79,34 +92,31 @@ class ConveyorManager:
                 cur |= prev | prev << W_plus_1 | prev >> W_plus_1
 
             cur &= pass_
-            print(cur >> (29 * W_plus_1 + 11) & 1, from_.bit_length() - 1)
 
             if cur & from_:
                 # TODO
-                i: int = from_.bit_length() - 1
-                print(i)
-                pos: Position = Position(i % W_plus_1, i // W_plus_1)
-                i: int = (seen[-1] & adj).bit_length() - 1
-                print(i)
+                cur: int = seen[-1]
+                i: int = (from_ & (cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1)).bit_length() - 1
                 if i == -1:
+                    prev: int = seen[-2]
+                    prev |= prev << 1 | prev >> 1
+                    prev |= prev << W_plus_1 | prev >> W_plus_1
+                    i: int = (from_ & prev).bit_length() - 1
+                    pos: Position = Position(i % W_plus_1, i // W_plus_1)
                     from_ |= from_ << 1 | from_ >> 1
                     from_ |= from_ << W_plus_1 | from_ >> W_plus_1
-                    i: int = (seen[-2] & from_).bit_length() - 1
-                    nxt: Position = Position(i % W_plus_1, i // W_plus_1)
-                    if c.can_destroy(pos):
-                        c.destroy(pos)
-                    if c.can_build_bridge(pos, nxt):
-                        c.build_bridge(pos, nxt)
+                    j: int = (seen[-2] & from_).bit_length() - 1
+                    nxt: Position = Position(j % W_plus_1, j // W_plus_1)
                 else:
-                    nxt: Position = Position(i % W_plus_1, i // W_plus_1)
+                    pos: Position = Position(i % W_plus_1, i // W_plus_1)
+                    j: int = (cur & adj).bit_length() - 1
+                    nxt: Position = Position(j % W_plus_1, j // W_plus_1)
                     d: Direction = pos.direction_to(nxt)
-                    if c.can_destroy(pos):
-                        c.destroy(pos)
-                    if c.can_build_conveyor(pos, d):
-                        c.build_conveyor(pos, d)
-                return
+                return pos, nxt
 
             seen.append(cur)
+
+        return ()
 
     def compute(self, c: Controller, tile_manager: TileManager, start: Position, avoid_joining: bool, is_harvester: bool = True):
         W_plus_1 = C.W + 1

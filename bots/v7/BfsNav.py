@@ -120,12 +120,6 @@ class BfsNav(Nav):
                     print("No path?")
                     return False
 
-        if target & not_unit & adj:
-            return move(target & not_unit & adj)
-
-        if (target & me) and active:
-            return True
-
         g: list[list[bool]] = [[p == 2 for p in row] for row in self.tile_manager.pass_grid]
         for row in g:
             row.append(False)
@@ -135,6 +129,13 @@ class BfsNav(Nav):
         byte_tuples: list[tuple] = list(batched(chain.from_iterable(g), 8))
         byte_tuples[-1] += (False,) * (8 - len(byte_tuples[-1]))
         pass_ = int.from_bytes((CACHE[byte] for byte in byte_tuples[:-1]), byteorder='little') & not_unit
+
+        if target & not_unit & adj & pass_:
+            return move(target & not_unit & adj & pass_)
+
+        if (target & me) and active:
+            return True
+
         seen = target
         for _ in range(100):
             seen |= seen << 1 | seen >> 1

@@ -529,30 +529,32 @@ class BuilderBot(Unit):
                 if to_heal:
                     self.target_type = ~self.target_type
 
-        lack_protection: set[Position] = self.tile_manager.lack_protection
+        lack_protection: dict[Position, Position] = self.tile_manager.lack_protection
         if 0 <= self.target_type <= 2 and lack_protection:
             def build_barrier():
                 if U.can_afford("conveyor"):
-                    for pos in lack_protection:
+                    for pos, target in lack_protection.items():
                         if pos.distance_squared(my_pos) <= 2:
                             if c.can_destroy(pos):
                                 c.destroy(pos)
-                            if c.can_build_barrier(pos):
-                                c.build_barrier(pos)
-                                lack_protection.remove(pos)
+                            d: Direction = pos.direction_to(target)
+                            if c.can_build_conveyor(pos, d):
+                                c.build_conveyor(pos, d)
+                                lack_protection.pop(pos)
                                 self.movement.act(c)
                                 break
 
             build_barrier()
 
             if lack_protection:
-                self.nav.multimove(c, list(lack_protection), self.movement, adj=True, exc=True)
+                self.movement.enrich(c)
+                self.nav.multimove(c, list(lack_protection.keys()), self.movement, adj=True)
                 build_barrier()
                 self.target_type = ~self.target_type
 
         W: int = C.W
         W_plus_1: int = W + 1
-        unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested)
+        unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested) & ~self.tile_manager["unit"]
         if 0 <= self.target_type <= 2 and unharvested:
             if U.can_afford("harvester"):
                 self.nav.multimove(c, unharvested, self.movement, adj=True, exc=True)
@@ -570,33 +572,63 @@ class BuilderBot(Unit):
 
             self.target_type = ~self.target_type
 
-        orphans: list[int] = self.tile_manager.network.orphans
-        if 0 <= self.target_type <= 2 and orphans:
-            self.nav.multimove(c, sum(1 << (index + index // W) for index in orphans), self.movement)
+        if 0 <= self.target_type <= 2:
+            edge: tuple = ()
+            orphans: list[int] = self.tile_manager.network.orphans
+            if orphans:
+                edge: tuple = ConveyorManager.get_edge(self.tile_manager, sum(1 << (index + index // W) for index in orphans))
 
-            for index in orphans:
-                pos: Position = Position(index % W, index // W)
-                if pos.distance_squared(my_pos) <= 2:
-                    ConveyorManager.build_from(c, self.tile_manager, 1 << (index + index // W))
-                    break
+            if not edge:
+                adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
+                adj_empty |= adj_empty << 1 | adj_empty >> 1 | adj_empty << W_plus_1 | adj_empty >> W_plus_1
+                adj_empty &= self.tile_manager["buildable"] & self.tile_manager["empty"]
 
-            self.target_type = ~self.target_type
+                if adj_empty:
+                    edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty)
 
-        adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
-        adj_empty |= adj_empty << 1 | adj_empty >> 1 | adj_empty << W_plus_1 | adj_empty >> W_plus_1
-        adj_empty &= self.tile_manager["buildable"] & self.tile_manager["empty"]
-        if 0 <= self.target_type <= 2 and adj_empty:
-            self.nav.multimove(c, adj_empty, self.movement)
+            if edge:
+                pos, nxt = edge
+                built: bool = False
+                if pos.distance_squared(nxt) == 1:
+                    if U.can_afford("conveyor"):
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+                        d: Direction = pos.direction_to(nxt)
+                        if c.can_build_conveyor(pos, d):
+                            c.build_conveyor(pos, d)
+                            self.movement.act(c)
+                            built = True
 
-            x, y = my_pos = c.get_position()
-            adj: int = 1 << (y * W_plus_1 + x)
-            adj |= adj << 1 | adj >> 1
-            adj |= adj << W_plus_1 | adj >> W_plus_1
+                    if not built:
+                        self.nav.move(c, pos, self.movement)
 
-            if adj & adj_empty:
-                ConveyorManager.build_from(c, self.tile_manager, 1 << ((adj & adj_empty).bit_length() - 1))
+                        if U.can_afford("conveyor"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            d: Direction = pos.direction_to(nxt)
+                            if c.can_build_conveyor(pos, d):
+                                c.build_conveyor(pos, d)
+                                self.movement.act(c)
+                else:
+                    if U.can_afford("bridge"):
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+                        if c.can_build_bridge(pos, nxt):
+                            c.build_bridge(pos, nxt)
+                            self.movement.act(c)
+                            built = True
 
-            self.target_type = ~self.target_type
+                    if not built:
+                        self.nav.move(c, pos, self.movement)
+
+                        if U.can_afford("bridge"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            if c.can_build_bridge(pos, nxt):
+                                c.build_bridge(pos, nxt)
+                                self.movement.act(c)
+
+                self.target_type = ~self.target_type
 
         print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)
