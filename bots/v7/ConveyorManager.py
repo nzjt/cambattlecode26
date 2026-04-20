@@ -373,6 +373,7 @@ class ConveyorManager:
                 if c.get_position(bb_id).distance_squared(self.path[0]) <= 2:
                     enemy_near = True
                     break
+        movement.enrich(c)
 
         def build_barriers() -> bool:
             pos: Position = self.path[0]
@@ -434,7 +435,6 @@ class ConveyorManager:
                                     if c.can_destroy(self.path[0]):
                                         c.destroy(self.path[0])
                                         c.build_road(self.path[0])
-                                movement.enrich(c)
                                 movement.move(d)
                                 on_ore = True
                             else:
@@ -663,7 +663,6 @@ class ConveyorManager:
 
             if keep_turret:
                 if my_pos != self.path[self.index - 1]:
-                    movement.enrich(c)
                     self.nav.move(c, self.path[self.index - 1], movement)
 
                     if not c.get_move_cooldown():
@@ -792,13 +791,11 @@ class ConveyorManager:
                                     else:
                                         pass  # TODO
                                 else:
-                                    movement.enrich(c)
                                     self.nav.move(c, pos, movement)
                     else:
                         building_id = c.get_tile_building_id(self.conveyor)
                         if c.get_team(building_id) == my_team or c.get_entity_type(building_id) == EntityType.MARKER:
                             if dist:
-                                movement.enrich(c)
                                 self.nav.move(c, pos, movement)
 
                             target: Position | None = None
@@ -835,7 +832,6 @@ class ConveyorManager:
                                                 pass  # TODO
                         else:
                             if my_pos != self.conveyor:
-                                movement.enrich(c)
                                 self.nav.move(c, self.conveyor, movement)
                                 my_pos = c.get_position()
 
@@ -844,7 +840,6 @@ class ConveyorManager:
                                     c.fire(my_pos)
                 else:
                     if dist:
-                        movement.enrich(c)
                         self.nav.move(c, pos, movement)
 
                     if not c.get_action_cooldown() and c.get_global_resources()[0] >= c.get_splitter_cost()[0]:
