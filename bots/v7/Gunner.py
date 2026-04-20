@@ -56,9 +56,6 @@ class Gunner(Unit):
                 c.fire(actual_target)
                 return
 
-        if c.get_action_cooldown() or c.get_global_resources()[0] < 10:
-            return
-
         target = my_pos
         useful: bool = False
         for _ in range(3 if d in C.CARDINAL else 2):
@@ -82,7 +79,9 @@ class Gunner(Unit):
                             if c.get_team(building_id) == my_team:
                                 break
                             elif c.get_entity_type(building_id) not in C.UNIMPORTANT:
-                                c.rotate(d)
+                                if c.can_rotate(d):
+                                    c.rotate(d)
                                 return
                     else:
                         break
+            c.self_destruct()

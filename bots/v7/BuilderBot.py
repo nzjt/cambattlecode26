@@ -531,10 +531,11 @@ class BuilderBot(Unit):
                 allowed |= mask
 
             edge: tuple = ()
+            has_gunner: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.gunners)
             orphans: int = sum(1 << (index + index // W) for index in self.tile_manager.network.orphans) & allowed
             if orphans:
                 print("try orphans")
-                edge: tuple = ConveyorManager.get_edge(self.tile_manager, orphans)
+                edge: tuple = ConveyorManager.get_edge(self.tile_manager, orphans & ~has_gunner)
 
             if not edge:
                 adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
@@ -543,7 +544,7 @@ class BuilderBot(Unit):
 
                 if adj_empty:
                     print("try empty ore")
-                    edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty)
+                    edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty & ~has_gunner)
 
             if edge:
                 pos, nxt = edge
@@ -581,7 +582,7 @@ class BuilderBot(Unit):
 
                 if my_pos.distance_squared(pos) <= 8:
                     building_id = c.get_tile_building_id(nxt)
-                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
+                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
                         self.nav.move(c, pos, self.movement, adj=True, exc=True)
                         my_pos = c.get_position()
 
@@ -601,6 +602,8 @@ class BuilderBot(Unit):
                 try_build()
 
                 self.target_type = ~self.target_type
+            elif orphans:
+                self.nav.multimove(c, orphans, self.movement, adj=True, active=True)
 
         if self.target_type >= 0:
             building_id = c.get_tile_building_id(my_pos)

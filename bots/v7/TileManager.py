@@ -173,14 +173,15 @@ class TileManager:
             else:
                 e_type: EntityType = get_entity_type(building_id)
                 team: Team = c.get_team(building_id)
+                bit: int = 1 << xi
                 if e_type == ROAD:
-                    pass_bitset[yi] |= 1 << xi
+                    pass_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
                         nxt[index] = -1
+                    enemy_bitset[yi] &= ~bit
                 elif e_type in CONVEYOR_VARIANT:
-                    bit: int = 1 << xi
                     pass_bitset[yi] |= bit
                     if team == my_team:
                         if c.get_hp(building_id) < 20:
@@ -204,17 +205,18 @@ class TileManager:
                             wander_seen |= bit
                         if building_id != id_grid[yi][xi]:
                             new_conveyor |= 1 << (k + yk)
+                        enemy_bitset[yi] &= ~bit
                     else:
-                        enemy_bitset[yi] |= 1 << xi
+                        enemy_bitset[yi] |= bit
                 elif e_type == BARRIER:
-                    bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
                     buildable_bitset[yi] &= ~bit
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
+                        enemy_bitset[yi] &= ~bit
                     else:
-                        enemy_bitset[yi] |= 1 << xi
+                        enemy_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
@@ -223,15 +225,14 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < 500:
                             to_heal.add(pos)
-                        pass_bitset[yi] |= 1 << xi
+                        pass_bitset[yi] |= bit
                     else:
-                        enemy_bitset[yi] |= 1 << xi
-                        bit: int = 1 << xi
-                        pass_bitset[yi] &= ~bit
+                        enemy_bitset[yi] |= bit
                         buildable_bitset[yi] &= ~bit
                         self.enemy_core = c.get_position(building_id)
                 elif e_type == MARKER:
-                    buildable_bitset[yi] |= 1 << xi
+                    buildable_bitset[yi] |= bit
+                    enemy_bitset[yi] &= ~bit
                     if self.enemy_core is None:
                         if team == my_team:
                             symmetry &= get_marker_value(building_id)
@@ -240,7 +241,6 @@ class TileManager:
                         adj[j].remove(index)
                         nxt[index] = -1
                 elif e_type == GUNNER:
-                    bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
                     buildable_bitset[yi] &= ~bit
                     if team == my_team:
@@ -253,26 +253,33 @@ class TileManager:
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
+                        enemy_bitset[yi] &= ~bit
                     else:
                         enemy_turrets.append(pos)
-                        enemy_bitset[yi] |= 1 << xi
+                        enemy_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
                         nxt[index] = -1
                 elif e_type == EntityType.SENTINEL:
-                    if team != my_team:
+                    if team == my_team:
+                        enemy_bitset[yi] &= ~bit
+                    else:
                         enemy_turrets.append(pos)
-                        enemy_bitset[yi] |= 1 << xi
+                        enemy_bitset[yi] |= bit
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
                 else:
-                    bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
                     buildable_bitset[yi] &= ~bit
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
+                        enemy_bitset[yi] &= ~bit
                     else:
-                        enemy_bitset[yi] |= 1 << xi
+                        enemy_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
