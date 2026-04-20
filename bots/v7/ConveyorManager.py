@@ -26,6 +26,8 @@ class ConveyorManager:
         self.splitter: Position | None = None
         self.conveyor: Position | None = None
         self.prev_resource: int | None = None
+        self.prev_health: int = 0
+        self.use_gunner: bool = False
 
     @staticmethod
     def scaling(path: list[Position]):
@@ -693,15 +695,25 @@ class ConveyorManager:
         e_type = c.get_entity_type(building_id)
         has_enemy = c.get_team(c.get_tile_builder_bot_id(pos)) != my_team
         if c.get_team(building_id) != my_team and e_type != EntityType.MARKER:
-            if e_type in C.DESTROY_ENEMY and not has_enemy:
-                if my_pos != pos:
-                    self.nav.move(c, pos, movement)
-                if c.can_fire(pos):
-                    c.fire(pos)
-                return
+            if e_type in C.DESTROY_ENEMY and not has_enemy and not self.use_gunner:
+                hp: int = c.get_hp(building_id)
+                if hp > self.prev_health:
+                    self.use_gunner = True
+                    need_gunner = True
+                else:
+                    self.prev_health = hp
+                    if my_pos != pos:
+                        self.nav.move(c, pos, movement)
+                    if c.can_fire(pos):
+                        c.fire(pos)
+                        self.prev_health = hp - 2
+                    else:
+                        self.prev_health = hp
+                    return
             else:
                 need_gunner = True
         else:
+            self.prev_health = 1000
             need_gunner = False
 
         if need_gunner:
@@ -709,11 +721,12 @@ class ConveyorManager:
                 self.index = 0
                 return
 
-            self.index -= 1
-            if not self.index:
+            if self.index == 1:
                 return
-            pos = self.path[self.index]
+            pos = self.path[self.index - 1]
+            decrement: bool = True
         else:
+            decrement: bool = False
             nxt: Position = self.path[self.index + 1]
             need_gunner = c.is_in_vision(nxt)
             if need_gunner:
@@ -870,7 +883,7 @@ class ConveyorManager:
                             else:
                                 pass  # TODO
             else:
-                d: Direction = pos.direction_to(nxt)
+                d: Direction = pos.direction_to(self.path[self.index] if decrement else nxt)
 
                 enemy_core = tile_manager.enemy_core
                 if enemy_core is not None:
@@ -888,6 +901,10 @@ class ConveyorManager:
 
                         if c.can_build_gunner(pos, d):
                             c.build_gunner(pos, d)
+                            self.use_gunner = False
+
+                        if decrement:
+                            self.index -= 1
                 else:
                     # Try build sentinel
                     # TODO: refine
