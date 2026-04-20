@@ -88,8 +88,8 @@ class ConveyorManager:
             cur: int = seen[-1]
             cur |= cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1
 
-            if len(seen) >= 2:
-                prev: int = seen[-2]
+            if len(seen) >= 6:
+                prev: int = seen[-6]
                 prev |= prev << 1 | prev >> 1
                 cur |= prev | prev << W_plus_1 | prev >> W_plus_1
 
@@ -100,7 +100,7 @@ class ConveyorManager:
                 cur: int = seen[-1]
                 i: int = (from_ & (cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1)).bit_length() - 1
                 if i == -1:
-                    prev: int = seen[-2]
+                    prev: int = seen[-6]
                     prev |= prev << 1 | prev >> 1
                     prev |= prev << W_plus_1 | prev >> W_plus_1
                     i: int = (from_ & prev).bit_length() - 1
