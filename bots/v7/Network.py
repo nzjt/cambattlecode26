@@ -19,19 +19,16 @@ class Network:
         nxt[index + W] = -2
         nxt[index + W + 1] = -2
 
-        self.adj: list[list[int]] = []
+        self.adj: list[list[int]] = [[] for _ in range(W * H)]
         self.orphans: list[int] = []
         self.childless: list[int] = []
         self.bad: list[bool] = []
 
-    def update(self):
+    def update(self, c: Controller):
+        t0 = c.get_cpu_time_elapsed()
         W: int = C.W
         nxt: list[int] = self.nxt
-        adj = self.adj = [[] for _ in range(W * C.H)]
-        for i in range(W * C.H):
-            j: int = nxt[i]
-            if j >= 0:
-                adj[j].append(i)
+        adj: list[list[int]] = self.adj
 
         bad = self.bad = [i < 0 for i in nxt]
 
@@ -43,5 +40,5 @@ class Network:
                     queue.append(j)
 
         self.orphans = [i for i in range(W * C.H) if adj[i] and ((j := nxt[i]) == -1 or j >= 0 and nxt[j] == -3)]
-        print(adj[1461], nxt[1461], self.orphans)
         self.childless = [i for i in range(W * C.H) if nxt[i] == -2]
+        print(c.get_cpu_time_elapsed() - t0, "update network")

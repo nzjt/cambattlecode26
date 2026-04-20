@@ -119,6 +119,7 @@ class TileManager:
         to_heal: set[Position] = {pos for pos in self.to_heal if not c.is_in_vision(pos) or c.get_hp(building_id := c.get_tile_building_id(pos)) < c.get_max_hp(building_id)}
 
         nxt: list[int] = self.network.nxt
+        adj: list[list[int]] = self.network.adj
 
         is_protection: dict[Position, Position] = {
             pos: target for pos, target in self.is_protection.items() if not c.is_in_vision(pos) or (get_entity_type(building_id := get_tile_building_id(pos)) == EntityType.CONVEYOR and get_direction(building_id) == pos.direction_to(target) and get_team(building_id) == my_team)
@@ -138,6 +139,7 @@ class TileManager:
 
             building_id = get_tile_building_id(pos)
             env: Environment = get_tile_env(pos)
+            index: int = yi * W + xi
             if building_id is None:
                 bit: int = 1 << xi
                 pass_bitset[yi] &= ~bit
@@ -145,13 +147,19 @@ class TileManager:
                     buildable_bitset[yi] |= bit
                 else:
                     buildable_bitset[yi] &= ~bit
-                nxt[yi * W + xi] = -1
+                j: int = nxt[index]
+                if j >= 0:
+                    adj[j].remove(index)
+                    nxt[index] = -1
             else:
                 e_type: EntityType = get_entity_type(building_id)
                 team: Team = c.get_team(building_id)
                 if e_type == ROAD:
                     pass_bitset[yi] |= 1 << xi
-                    nxt[yi * W + xi] = -1
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
                 elif e_type in CONVEYOR_VARIANT:
                     bit: int = 1 << xi
                     pass_bitset[yi] |= bit
@@ -168,8 +176,13 @@ class TileManager:
                         else:
                             target: Position = c.get_bridge_target(building_id)
                             bridge_bitset[yi] |= bit
+                        j: int = nxt[index]
+                        if j >= 0:
+                            adj[j].remove(index)
                         xj, yj = target
-                        nxt[yi * W + xi] = yj * W + xj
+                        j: int = yj * W + xj
+                        nxt[index] = j
+                        adj[j].append(index)
                         if my_pos.distance_squared(pos) <= 10:
                             wander_seen.add(pos)
                             wander_unseen.discard(pos)
@@ -182,7 +195,10 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
-                    nxt[yi * W + xi] = -1
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
                 elif e_type == CORE:
                     if team == my_team:
                         if c.get_hp(building_id) < 500:
@@ -198,7 +214,10 @@ class TileManager:
                     if self.enemy_core is None:
                         if team == my_team:
                             symmetry &= get_marker_value(building_id)
-                    nxt[yi * W + xi] = -1
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
                 elif e_type == GUNNER:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -215,7 +234,10 @@ class TileManager:
                                 self.has_kill_chamber = True
                     else:
                         enemy_turrets.append(pos)
-                    nxt[yi * W + xi] = -1
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
                 elif e_type == EntityType.SENTINEL:
                     if team != my_team:
                         enemy_turrets.append(pos)
@@ -226,7 +248,10 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
-                    nxt[yi * W + xi] = -1
+                    j: int = nxt[index]
+                    if j >= 0:
+                        adj[j].remove(index)
+                        nxt[index] = -1
             if env == Environment.EMPTY:
                 empty_bitset[yi] |= 1 << xi
             elif env != Environment.WALL:
@@ -267,7 +292,7 @@ class TileManager:
                 bot_tracker[bb_id] = (pos, lo, round)
         print(c.get_cpu_time_elapsed())
 
-        self.network.update()
+        self.network.update(c)
 
         for pos in raw_ores:
             for d in C.CARDINAL:
