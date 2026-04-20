@@ -73,9 +73,10 @@ class ConveyorManager:
 
         if cur & adj:
             # TODO
-            i: int = (from_ & (adj << 1 | adj >> 1 | adj << W_plus_1 | adj >> W_plus_1)).bit_length() - 1
+            i: int = (from_ & (cur << 1 | cur >> 1 | cur << W_plus_1 | cur >> W_plus_1)).bit_length() - 1
             pos: Position = Position(i % W_plus_1, i // W_plus_1)
-            j: int = (cur & adj).bit_length() - 1
+            from_: int = 1 << i
+            j: int = (cur & (from_ << 1 | from_ >> 1 | from_ << W_plus_1 | from_ >> W_plus_1)).bit_length() - 1
             nxt: Position = Position(j % W_plus_1, j // W_plus_1)
             return pos, nxt
 
@@ -107,9 +108,9 @@ class ConveyorManager:
                     nxt: Position = Position(j % W_plus_1, j // W_plus_1)
                 else:
                     pos: Position = Position(i % W_plus_1, i // W_plus_1)
-                    j: int = (cur & adj).bit_length() - 1
+                    from_: int = 1 << i
+                    j: int = (cur & (from_ << 1 | from_ >> 1 | from_ << W_plus_1 | from_ >> W_plus_1)).bit_length() - 1
                     nxt: Position = Position(j % W_plus_1, j // W_plus_1)
-                    d: Direction = pos.direction_to(nxt)
                 return pos, nxt
 
             seen.append(cur)

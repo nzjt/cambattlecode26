@@ -51,6 +51,7 @@ class TileManager:
         self.lack_protection: dict[Position, Position] = {}
         self.empty_ore: set[Position] = set()
         self.unharvested: set[Position] = set()
+        self.enemy_turrets: list[Position] = []
 
     def see(self, x: int, y: int):
         W_plus_1: int = C.W + 1
@@ -129,6 +130,7 @@ class TileManager:
         unharvested: set[Position] = self.unharvested
 
         raw_ores: list[Position] = []
+        enemy_turrets: list[Position] = []
 
         print(c.get_cpu_time_elapsed())
         for pos in c.get_nearby_tiles():
@@ -211,7 +213,12 @@ class TileManager:
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
+                    else:
+                        enemy_turrets.append(pos)
                     nxt[yi * W + xi] = -1
+                elif e_type == EntityType.SENTINEL:
+                    if team != my_team:
+                        enemy_turrets.append(pos)
                 else:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -283,16 +290,20 @@ class TileManager:
                         has_space = True
                         empty_adj.add(cur)
                     else:
-                        if c.get_team(b_id) != my_team:
-                            continue
                         e_type = c.get_entity_type(b_id)
-                        if e_type == EntityType.BRIDGE:
-                            has_conveyor = c.get_bridge_target(b_id) != pos
-                        elif e_type in C.CONVEYOR_VARIANT:
-                            has_conveyor |= cur not in is_protection
-                        elif e_type in C.UNIMPORTANT:
-                            has_space = True
-                            empty_adj.add(cur)
+                        if c.get_team(b_id) == my_team:
+                            e_type = c.get_entity_type(b_id)
+                            if e_type == EntityType.BRIDGE:
+                                has_conveyor = c.get_bridge_target(b_id) != pos
+                            elif e_type in C.CONVEYOR_VARIANT:
+                                has_conveyor |= cur not in is_protection
+                            elif e_type in C.UNIMPORTANT:
+                                has_space = True
+                                empty_adj.add(cur)
+                        else:
+                            if e_type in C.UNIMPORTANT:
+                                empty_adj.add(cur)
+                                has_space = True
 
             building_id = c.get_tile_building_id(pos)
             unharvested.discard(pos)
@@ -447,6 +458,8 @@ class TileManager:
             reach |= reach << W_plus_1 | reach >> W_plus_1
             reach &= empty
         self.reach = reach
+
+        self.enemy_turrets = enemy_turrets
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")

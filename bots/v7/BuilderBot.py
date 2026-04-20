@@ -82,32 +82,32 @@ class BuilderBot(Unit):
             else:
                 return trustworthy
 
-        if self.target_type == 4:
-            dist = my_pos.distance_squared(self.target)
-            if dist <= 13:
-                self.target_type = 0
-                building_id = c.get_tile_building_id(self.target)
-                if c.get_team(building_id) != my_team and c.get_entity_type(building_id) == EntityType.HARVESTER:
-                    has_space, has_enemy = False, False
-                    for d in C.CARDINAL:
-                        nxt: Position = self.target.add(d)
-                        if U.on_the_map(nxt):
-                            building_id = c.get_tile_building_id(nxt)
-                            if building_id is None:
-                                has_space = c.get_tile_env(nxt) != Environment.WALL
-                            elif c.get_team(building_id) == my_team:
-                                e_type = c.get_entity_type(building_id)
-                                if e_type == EntityType.SENTINEL:
-                                    has_enemy = False
-                                    break
-                                else:
-                                    has_space |= e_type in C.UNIMPORTANT
-                            else:
-                                has_enemy |= c.get_entity_type(building_id) != EntityType.MARKER
-
-                    if has_space and has_enemy:
-                        self.target_type = 4
-        elif self.target_type == 5:
+        # if self.target_type == 4:
+        #     dist = my_pos.distance_squared(self.target)
+        #     if dist <= 13:
+        #         self.target_type = 0
+        #         building_id = c.get_tile_building_id(self.target)
+        #         if c.get_team(building_id) != my_team and c.get_entity_type(building_id) == EntityType.HARVESTER:
+        #             has_space, has_enemy = False, False
+        #             for d in C.CARDINAL:
+        #                 nxt: Position = self.target.add(d)
+        #                 if U.on_the_map(nxt):
+        #                     building_id = c.get_tile_building_id(nxt)
+        #                     if building_id is None:
+        #                         has_space = c.get_tile_env(nxt) != Environment.WALL
+        #                     elif c.get_team(building_id) == my_team:
+        #                         e_type = c.get_entity_type(building_id)
+        #                         if e_type == EntityType.SENTINEL:
+        #                             has_enemy = False
+        #                             break
+        #                         else:
+        #                             has_space |= e_type in C.UNIMPORTANT
+        #                     else:
+        #                         has_enemy |= c.get_entity_type(building_id) != EntityType.MARKER
+        #
+        #             if has_space and has_enemy:
+        #                 self.target_type = 4
+        if self.target_type == 5:
             if self.conveyor_manager is None and not needs_repair(self.target, True):
                 self.target_type = 0
         elif self.target_type == 7:
@@ -207,29 +207,29 @@ class BuilderBot(Unit):
                 building_id = c.get_tile_building_id(pos)
                 dist = my_pos.distance_squared(pos)
                 if env == Environment.ORE_TITANIUM:
-                    if c.get_entity_type(building_id) == EntityType.HARVESTER:
-                        if dist <= 13:
-                            has_space, has_enemy = False, False
-                            for d in C.CARDINAL:
-                                nxt = pos.add(d)
-                                if U.on_the_map(nxt):
-                                    b_id = c.get_tile_building_id(nxt)
-                                    if b_id is None:
-                                        has_space = c.get_tile_env(nxt) != Environment.WALL
-                                    elif c.get_team(b_id) == my_team:
-                                        e_type = c.get_entity_type(b_id)
-                                        if e_type == EntityType.SENTINEL:
-                                            has_enemy = False
-                                            break
-                                        else:
-                                            has_space |= e_type in C.UNIMPORTANT
-                                    else:
-                                        has_enemy |= c.get_entity_type(b_id) != EntityType.MARKER
-
-                            if has_space and has_enemy:
-                                self.target = pos
-                                self.target_type = 4
-                                break
+                    # if c.get_entity_type(building_id) == EntityType.HARVESTER:
+                    #     if dist <= 13:
+                    #         has_space, has_enemy = False, False
+                    #         for d in C.CARDINAL:
+                    #             nxt = pos.add(d)
+                    #             if U.on_the_map(nxt):
+                    #                 b_id = c.get_tile_building_id(nxt)
+                    #                 if b_id is None:
+                    #                     has_space = c.get_tile_env(nxt) != Environment.WALL
+                    #                 elif c.get_team(b_id) == my_team:
+                    #                     e_type = c.get_entity_type(b_id)
+                    #                     if e_type == EntityType.SENTINEL:
+                    #                         has_enemy = False
+                    #                         break
+                    #                     else:
+                    #                         has_space |= e_type in C.UNIMPORTANT
+                    #                 else:
+                    #                     has_enemy |= c.get_entity_type(b_id) != EntityType.MARKER
+                    #
+                    #         if has_space and has_enemy:
+                    #             self.target = pos
+                    #             self.target_type = 4
+                    #             break
 
                     if self.tile_manager.build_harvester[pos.y][pos.x]:
                         if self.target_type <= 2:
@@ -254,46 +254,46 @@ class BuilderBot(Unit):
                         self.ores.discard(pos)
 
                 e_type = c.get_entity_type(building_id)
-                if c.get_team(building_id) != my_team and e_type in C.DANGEROUS:
-                    x, y = pos
-                    if not self.tile_manager.gunner_covered_grid[y][x]:
-                        for d in C.CARDINAL:
-                            nxt: Position = pos.add(d)
-                            if U.is_visible(nxt):
-                                building_id = c.get_tile_building_id(nxt)
-                                if c.get_team(building_id) == my_team:
-                                    e_type = c.get_entity_type(building_id)
-                                    if e_type == EntityType.BRIDGE:
-                                        if pos != c.get_bridge_target(building_id):
-                                            continue
-                                    elif e_type in C.CONVEYOR_VARIANT:
-                                        if d != c.get_direction(building_id).opposite():
-                                            continue
-                                    else:
-                                        continue
-                                    self.target = nxt
-                                    self.sub_target = pos
-                                    self.target_type = 7
-                                    break
-
-                        if self.target_type < 7:
-                            for d in C.CARDINAL:
-                                nxt: Position = pos.add(d)
-                                for e in C.CARDINAL:
-                                    if e == d.opposite():
-                                        continue
-                                    adj: Position = nxt.add(e)
-                                    if U.is_visible(adj):
-                                        if e == d and c.get_tile_env(nxt) == Environment.WALL:
-                                            continue
-                                        building_id = c.get_tile_building_id(adj)
-                                        if c.get_team(building_id) == my_team:
-                                            e_type = c.get_entity_type(building_id)
-                                            if e_type in C.CONVEYOR_VARIANT:
-                                                self.target = adj
-                                                self.sub_target = pos
-                                                self.target_type = 7
-                                                break
+                # if c.get_team(building_id) != my_team and e_type in C.DANGEROUS:
+                #     x, y = pos
+                #     if not self.tile_manager.gunner_covered_grid[y][x]:
+                #         for d in C.CARDINAL:
+                #             nxt: Position = pos.add(d)
+                #             if U.is_visible(nxt):
+                #                 building_id = c.get_tile_building_id(nxt)
+                #                 if c.get_team(building_id) == my_team:
+                #                     e_type = c.get_entity_type(building_id)
+                #                     if e_type == EntityType.BRIDGE:
+                #                         if pos != c.get_bridge_target(building_id):
+                #                             continue
+                #                     elif e_type in C.CONVEYOR_VARIANT:
+                #                         if d != c.get_direction(building_id).opposite():
+                #                             continue
+                #                     else:
+                #                         continue
+                #                     self.target = nxt
+                #                     self.sub_target = pos
+                #                     self.target_type = 7
+                #                     break
+                #
+                #         if self.target_type < 7:
+                #             for d in C.CARDINAL:
+                #                 nxt: Position = pos.add(d)
+                #                 for e in C.CARDINAL:
+                #                     if e == d.opposite():
+                #                         continue
+                #                     adj: Position = nxt.add(e)
+                #                     if U.is_visible(adj):
+                #                         if e == d and c.get_tile_env(nxt) == Environment.WALL:
+                #                             continue
+                #                         building_id = c.get_tile_building_id(adj)
+                #                         if c.get_team(building_id) == my_team:
+                #                             e_type = c.get_entity_type(building_id)
+                #                             if e_type in C.CONVEYOR_VARIANT:
+                #                                 self.target = adj
+                #                                 self.sub_target = pos
+                #                                 self.target_type = 7
+                #                                 break
 
                 if dist <= 10:
                     bb_id = c.get_tile_builder_bot_id(pos)
@@ -429,6 +429,29 @@ class BuilderBot(Unit):
                     self.target_type = 1
                     self.expiry = c.get_current_round() + 260
 
+        W: int = C.W
+        W_plus_1: int = W + 1
+        adj: list[list[int]] = self.tile_manager.network.adj
+        destroy_set: set[Position] = set()
+        for pos in self.tile_manager.enemy_turrets:
+            x, y = pos
+            for i in adj[y * W + x]:
+                x, y = i % W, i // W
+                destroy_set.add(Position(x, y))
+
+        def try_destroy():
+            rem: list[Position] = [pos for pos in destroy_set if c.can_destroy(pos)]
+            for pos in rem:
+                c.destroy(pos)
+                destroy_set.remove(pos)
+
+        try_destroy()
+
+        if destroy_set:
+            self.nav.multimove(c, sum(1 << (y * W_plus_1 + x) for x, y in destroy_set), self.movement, adj=True)
+
+        try_destroy()
+
         to_heal: set[Position] = self.tile_manager.to_heal
         if self.target_type >= 0 and to_heal:
             def heal():
@@ -457,12 +480,21 @@ class BuilderBot(Unit):
                 if to_heal:
                     self.target_type = ~self.target_type
 
-        lack_protection: dict[Position, Position] = self.tile_manager.lack_protection
-        if 0 <= self.target_type <= 2 and lack_protection:
+        lack_protection: dict[Position, Position] = {
+            pos: target for pos, target in self.tile_manager.lack_protection.items() if not adj[pos.y * W + pos.x]
+        }
+        if 0 <= self.target_type and lack_protection:
             def build_barrier():
                 if U.can_afford("conveyor"):
                     for pos, target in lack_protection.items():
                         if pos.distance_squared(my_pos) <= 2:
+                            if pos == my_pos:
+                                building_id = c.get_tile_building_id(pos)
+                                if c.get_team(building_id) != my_team:
+                                    if c.can_fire(pos):
+                                        c.fire(pos)
+                                        self.movement.act(c)
+
                             if c.can_destroy(pos):
                                 c.destroy(pos)
                             d: Direction = pos.direction_to(target)
@@ -476,12 +508,10 @@ class BuilderBot(Unit):
 
             if lack_protection:
                 self.movement.enrich(c)
-                self.nav.multimove(c, list(lack_protection.keys()), self.movement, adj=True)
+                self.nav.multimove(c, list(lack_protection.keys()), self.movement)
                 build_barrier()
                 self.target_type = ~self.target_type
 
-        W: int = C.W
-        W_plus_1: int = W + 1
         unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested) & ~self.tile_manager["unit"]
         if 0 <= self.target_type <= 2 and unharvested:
             if U.can_afford("harvester"):
@@ -500,7 +530,7 @@ class BuilderBot(Unit):
 
             self.target_type = ~self.target_type
 
-        if 0 <= self.target_type <= 2:
+        if self.target_type >= 0:
             edge: tuple = ()
             orphans: list[int] = self.tile_manager.network.orphans
             if orphans:
@@ -517,39 +547,53 @@ class BuilderBot(Unit):
             if edge:
                 pos, nxt = edge
                 if pos.distance_squared(nxt) == 1:
-                    if U.can_afford("conveyor"):
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
-                        d: Direction = pos.direction_to(nxt)
-                        if c.can_build_conveyor(pos, d):
-                            c.build_conveyor(pos, d)
-                            self.movement.act(c)
-
-                    self.nav.move(c, pos, self.movement)
-
-                    if U.can_afford("conveyor"):
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
-                        d: Direction = pos.direction_to(nxt)
-                        if c.can_build_conveyor(pos, d):
-                            c.build_conveyor(pos, d)
-                            self.movement.act(c)
+                    def try_build():
+                        if U.can_afford("conveyor"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            d: Direction = pos.direction_to(nxt)
+                            if c.can_build_conveyor(pos, d):
+                                c.build_conveyor(pos, d)
+                                self.movement.act(c)
                 else:
-                    if U.can_afford("bridge"):
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
-                        if c.can_build_bridge(pos, nxt):
-                            c.build_bridge(pos, nxt)
+                    def try_build():
+                        if U.can_afford("bridge"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            if c.can_build_bridge(pos, nxt):
+                                c.build_bridge(pos, nxt)
+                                self.movement.act(c)
+
+                try_build()
+
+                if my_pos.distance_squared(pos) <= 8:
+                    building_id = c.get_tile_building_id(pos)
+                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
+                        self.nav.move(c, pos, self.movement)
+
+                        if c.can_fire(pos):
+                            c.fire(pos)
                             self.movement.act(c)
 
+                    building_id = c.get_tile_building_id(nxt)
+                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
+                        self.nav.move(c, pos, self.movement, adj=True, exc=True)
+                        my_pos = c.get_position()
+
+                        if U.can_afford("gunner"):
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            d: Direction = pos.direction_to(nxt)
+                            if c.can_build_gunner(pos, d):
+                                c.build_gunner(pos, d)
+                    else:
+                        self.nav.move(c, pos, self.movement)
+                        my_pos = c.get_position()
+                else:
                     self.nav.move(c, pos, self.movement)
+                    my_pos = c.get_position()
 
-                    if U.can_afford("bridge"):
-                        if c.can_destroy(pos):
-                            c.destroy(pos)
-                        if c.can_build_bridge(pos, nxt):
-                            c.build_bridge(pos, nxt)
-                            self.movement.act(c)
+                try_build()
 
                 self.target_type = ~self.target_type
 

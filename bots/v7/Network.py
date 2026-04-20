@@ -43,4 +43,5 @@ class Network:
                     queue.append(j)
 
         self.orphans = [i for i in range(W * C.H) if adj[i] and ((j := nxt[i]) == -1 or j >= 0 and nxt[j] == -3)]
+        print(adj[1461], nxt[1461], self.orphans)
         self.childless = [i for i in range(W * C.H) if nxt[i] == -2]
