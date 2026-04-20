@@ -60,6 +60,10 @@ class Launcher(Unit):
                         if bb_id is not None and c.get_team(bb_id) == my_team:
                             protect.append(pos)
 
+        if all(pos.distance_squared(my_pos) > 1 for pos in protect) and all(c.get_entity_type(bb_id) != EntityType.BUILDER_BOT or c.get_team(bb_id) != my_team for bb_id in c.get_nearby_units(4)):
+            c.self_destruct()
+            return
+
         if protect:
             for pos in protect:
                 c.draw_indicator_line(my_pos, pos, 0, 128, 255)
@@ -70,6 +74,8 @@ class Launcher(Unit):
                 best_enemy: Position | None = None
                 best_dist: int = 100
                 for bb_id in c.get_nearby_units():
+                    if c.get_entity_type(bb_id) != EntityType.BUILDER_BOT:
+                        continue
                     pos: Position = c.get_position(bb_id)
                     if pos.distance_squared(my_pos) <= 2:
                         if c.get_team(bb_id) != my_team:
