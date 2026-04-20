@@ -602,6 +602,51 @@ class BuilderBot(Unit):
 
                 self.target_type = ~self.target_type
 
+        if self.target_type >= 0:
+            building_id = c.get_tile_building_id(my_pos)
+            if c.get_team(building_id) != my_team and c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
+                blocked: list[bool] = [
+                    not U.on_the_map(pos := my_pos.add(d)) or c.get_tile_env(pos) == Environment.WALL for d in C.DIRECTIONS
+                ]
+                allow_set: dict[bool, EntityType] = {
+                    True: C.UNIMPORTANT | {EntityType.LAUNCHER},
+                    False: {EntityType.MARKER}
+                }
+                build_launcher: list[bool] = [
+                    U.on_the_map(pos := my_pos.add(d)) and c.get_tile_env(pos) != Environment.WALL and (building_id := c.get_tile_building_id(pos)) is None or c.get_entity_type(building_id) in allow_set[c.get_team(building_id) == my_team] for d in C.CARDINAL
+                ]
+                candidate: tuple = ()
+                for i in range(4):
+                    if build_launcher[i]:
+                        if build_launcher[(i + 2) % 4]:
+                            candidate = (i, (i + 2) % 4)
+                            break
+                        if all(blocked[j % 8] for j in range(i * 2 + 3, i * 2 + 6)):
+                            candidate = (i,)
+                            break
+                if candidate:
+                    for i in candidate:
+                        pos = my_pos.add(C.CARDINAL[i])
+                        building_id = c.get_tile_building_id(pos)
+                        if c.get_entity_type(building_id) != EntityType.LAUNCHER:
+                            if c.can_build_launcher(pos):
+                                c.build_launcher(pos)
+                            else:
+                                break
+                    else:
+                        if c.can_fire(my_pos):
+                            c.fire(my_pos)
+                    self.target_type = ~self.target_type
+            elif c.can_build_road(my_pos):
+                for d in C.CARDINAL:
+                    pos = my_pos.add(d)
+                    if U.on_the_map(pos):
+                        building_id = c.get_tile_building_id(pos)
+                        if c.get_entity_type(building_id) == EntityType.LAUNCHER and c.get_team(building_id) == my_team:
+                            c.build_road(my_pos)
+                            self.movement.act(c)
+                            break
+
         ever_seen: int = self.tile_manager.conveyor | self.tile_manager.bridge
         if self.target_type == 0:
             if self.must_patrol:
