@@ -136,25 +136,6 @@ class TileManager:
 
             building_id = get_tile_building_id(pos)
             env: Environment = get_tile_env(pos)
-            if env == Environment.EMPTY:
-                empty_bitset[yi] |= 1 << xi
-            elif env != Environment.WALL:
-                if env == Environment.ORE_TITANIUM:
-                    titanium_bitset[yi] |= 1 << xi
-                    if self.ban_harvester[yi][xi]:
-                        self.build_harvester[yi][xi] = False
-                        empty_ore.discard(pos)
-                    else:
-                        raw_ores.append(pos)
-                else:
-                    if self.ban_harvester[yi][xi]:
-                        self.build_harvester[yi][xi] = False
-                        self.axionite_ores.discard(pos)
-                    elif building_id is not None and c.get_entity_type(building_id) == EntityType.HARVESTER:
-                        self.build_harvester[yi][xi] = False
-                        self.axionite_ores.discard(pos)
-                    else:
-                        self.axionite_ores.add(pos)
             if building_id is None:
                 bit: int = 1 << xi
                 pass_bitset[yi] &= ~bit
@@ -162,11 +143,13 @@ class TileManager:
                     buildable_bitset[yi] |= bit
                 else:
                     buildable_bitset[yi] &= ~bit
+                nxt[yi * W + xi] = -1
             else:
                 e_type: EntityType = get_entity_type(building_id)
                 team: Team = c.get_team(building_id)
                 if e_type == ROAD:
                     pass_bitset[yi] |= 1 << xi
+                    nxt[yi * W + xi] = -1
                 elif e_type in CONVEYOR_VARIANT:
                     bit: int = 1 << xi
                     pass_bitset[yi] |= bit
@@ -197,6 +180,7 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
+                    nxt[yi * W + xi] = -1
                 elif e_type == CORE:
                     if team == my_team:
                         if c.get_hp(building_id) < 500:
@@ -212,6 +196,7 @@ class TileManager:
                     if self.enemy_core is None:
                         if team == my_team:
                             symmetry &= get_marker_value(building_id)
+                    nxt[yi * W + xi] = -1
                 elif e_type == GUNNER:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -226,6 +211,7 @@ class TileManager:
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
+                    nxt[yi * W + xi] = -1
                 else:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -233,6 +219,28 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
+                    nxt[yi * W + xi] = -1
+            if env == Environment.EMPTY:
+                empty_bitset[yi] |= 1 << xi
+            elif env != Environment.WALL:
+                if env == Environment.ORE_TITANIUM:
+                    titanium_bitset[yi] |= 1 << xi
+                    if self.ban_harvester[yi][xi]:
+                        self.build_harvester[yi][xi] = False
+                        empty_ore.discard(pos)
+                    else:
+                        raw_ores.append(pos)
+                        if get_entity_type(building_id) == EntityType.HARVESTER:
+                            nxt[yi * W + xi] = -3
+                else:
+                    if self.ban_harvester[yi][xi]:
+                        self.build_harvester[yi][xi] = False
+                        self.axionite_ores.discard(pos)
+                    elif building_id is not None and c.get_entity_type(building_id) == EntityType.HARVESTER:
+                        self.build_harvester[yi][xi] = False
+                        self.axionite_ores.discard(pos)
+                    else:
+                        self.axionite_ores.add(pos)
 
             bb_id = get_tile_builder_bot_id(pos)
             if bb_id is not None:
@@ -296,7 +304,6 @@ class TileManager:
             else:
                 unharvested.discard(pos)
                 xi, yi = pos
-                nxt[yi * W + xi] = -3
                 if get_team(building_id) != my_team:
                     is_mine = False
                 self.build_harvester[yi][xi] = False
