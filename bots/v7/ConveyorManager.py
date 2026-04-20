@@ -1,6 +1,5 @@
 import random
 from cambc import *
-from AStarJPSOptimised import AStarJPSOptimised
 from TileManager import TileManager
 from Movement import Movement
 from Bfs import Bfs
