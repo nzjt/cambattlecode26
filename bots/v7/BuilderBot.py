@@ -507,7 +507,15 @@ class BuilderBot(Unit):
         unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested) & ~self.tile_manager["unit"]
         if 0 <= self.target_type <= 2 and unharvested:
             if U.can_afford("harvester"):
-                self.nav.multimove(c, unharvested, self.movement, adj=True, exc=True)
+                stay: bool = False
+                if my_pos in self.tile_manager.unharvested:
+                    building_id = c.get_tile_building_id(my_pos)
+                    if c.get_team(building_id) != my_team:
+                        if c.can_fire(my_pos):
+                            c.fire(my_pos)
+                            stay = True
+
+                self.nav.multimove(c, unharvested, self.movement, adj=True, exc=not stay)
 
                 my_pos = c.get_position()
                 for pos in self.tile_manager.unharvested:
@@ -517,6 +525,14 @@ class BuilderBot(Unit):
                         if c.can_build_harvester(pos):
                             c.build_harvester(pos)
                             break
+
+                        building_id = c.get_tile_building_id(pos)
+                        if c.get_team(building_id) != my_team:
+                            if c.can_move(d := my_pos.direction_to(pos)):
+                                self.movement.move(d)
+                                my_pos = c.get_position()
+                            if c.can_fire(pos):
+                                c.fire(pos)
             else:
                 self.nav.multimove(c, unharvested, self.movement, adj=True)
                 my_pos = c.get_position()
@@ -547,6 +563,7 @@ class BuilderBot(Unit):
                     edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty & ~has_gunner)
 
             if edge:
+                print(edge)
                 pos, nxt = edge
                 if pos.distance_squared(nxt) == 1:
                     def try_build():
