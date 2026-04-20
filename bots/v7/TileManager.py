@@ -417,11 +417,12 @@ class TileManager:
 
             for d in C.CARDINAL:
                 cur: Position = pos.add(d)
-                xi, yi = cur
-                if 0 <= xi < W and 0 <= yi < H:
-                    if nxt[yi * W + xi] >= 0:
-                        empty_ore.discard(pos)
-                        break
+                if cur not in is_protection:
+                    xi, yi = cur
+                    if 0 <= xi < W and 0 <= yi < H:
+                        if nxt[yi * W + xi] >= 0:
+                            empty_ore.discard(pos)
+                            break
             else:
                 empty_ore.add(pos)
                 unharvested.discard(pos)

@@ -315,8 +315,7 @@ class BuilderBot(Unit):
             if edge:
                 pos, nxt = edge
                 if my_pos.distance_squared(pos) <= 8:
-                    building_id = c.get_tile_building_id(nxt)
-                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
+                    if pos.distance_squared(nxt) <= 2 and c.get_team(building_id := c.get_tile_building_id(nxt)) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
                         self.nav.move(c, pos, self.movement, adj=True, exc=True)
                         my_pos = c.get_position()
 

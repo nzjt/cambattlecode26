@@ -61,7 +61,8 @@ class ConveyorManager:
     def get_edge_to(tile_manager: TileManager, from_: int, to: int) -> tuple:
         W: int = C.W
         W_plus_1: int = W + 1
-        pass_: int = tile_manager.reach
+        reach: int = tile_manager.reach
+        pass_: int = reach
         pass_ &= ~(tile_manager.conveyor | tile_manager.bridge)
         pass_ |= sum(
             1 << (y * W_plus_1 + x) for x, y in tile_manager.is_protection
@@ -91,7 +92,10 @@ class ConveyorManager:
             if len(seen) >= 6:
                 prev: int = seen[-6]
                 prev |= prev << 1 | prev >> 1
-                cur |= prev | prev << W_plus_1 | prev >> W_plus_1
+                prev |= prev << W_plus_1 | prev >> W_plus_1
+                prev |= prev << 1 | prev >> 1
+                prev |= prev << W_plus_1 | prev >> W_plus_1
+                cur |= prev & reach
 
             cur &= pass_
 
@@ -104,11 +108,23 @@ class ConveyorManager:
                     prev |= prev << 1 | prev >> 1
                     prev |= prev << W_plus_1 | prev >> W_plus_1
                     i: int = (from_ & prev).bit_length() - 1
-                    pos: Position = Position(i % W_plus_1, i // W_plus_1)
-                    from_ |= from_ << 1 | from_ >> 1
-                    from_ |= from_ << W_plus_1 | from_ >> W_plus_1
-                    j: int = (seen[-2] & from_).bit_length() - 1
-                    nxt: Position = Position(j % W_plus_1, j // W_plus_1)
+                    if i == -1:
+                        prev |= prev << 1 | prev >> 1
+                        prev |= prev << W_plus_1 | prev >> W_plus_1
+                        i: int = (from_ & prev & reach).bit_length() - 1
+                        pos: Position = Position(i % W_plus_1, i // W_plus_1)
+                        from_ |= from_ << 1 | from_ >> 1
+                        from_ |= from_ << W_plus_1 | from_ >> W_plus_1
+                        from_ |= from_ << 1 | from_ >> 1
+                        from_ |= from_ << W_plus_1 | from_ >> W_plus_1
+                        j: int = (seen[-2] & from_ & reach).bit_length() - 1
+                        nxt: Position = Position(j % W_plus_1, j // W_plus_1)
+                    else:
+                        pos: Position = Position(i % W_plus_1, i // W_plus_1)
+                        from_ |= from_ << 1 | from_ >> 1
+                        from_ |= from_ << W_plus_1 | from_ >> W_plus_1
+                        j: int = (seen[-2] & from_).bit_length() - 1
+                        nxt: Position = Position(j % W_plus_1, j // W_plus_1)
                 else:
                     pos: Position = Position(i % W_plus_1, i // W_plus_1)
                     from_: int = 1 << i
