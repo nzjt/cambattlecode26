@@ -43,7 +43,7 @@ class ConveyorManager:
         W_plus_1 = C.W + 1
         pass_: int = tile_manager.reach
         if avoid_joining:
-            pass_ &= ~tile_manager["conveyor"]
+            pass_ &= ~(tile_manager["conveyor"] | tile_manager["bridge"])
         else:
             self.mode = 1
 
@@ -165,7 +165,7 @@ class ConveyorManager:
         if seen[0] & adj:
             return []
 
-        pass_ &= ~seen[0]
+        pass_ &= ~(seen[0] | tile_manager["bridge"])
 
         while len(seen) < 100:
             cur: int = seen[-1]

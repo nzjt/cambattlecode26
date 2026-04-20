@@ -12,7 +12,7 @@ class BfsNav(Nav):
         self.home: Position = home
         self.tile_manager: TileManager = tile_manager
 
-    def multimove(self, c: Controller, targets: list[Position] | int, movement: Movement, **kwargs) -> None:
+    def multimove(self, c: Controller, targets: list[Position] | int, movement: Movement, **kwargs) -> bool:
         W_plus_1: int = C.W + 1
         target: int = targets if isinstance(targets, int) else sum(
             1 << (y * W_plus_1 + x) for x, y in targets
@@ -35,14 +35,14 @@ class BfsNav(Nav):
         if not active:
             if target & me:
                 # Already at target
-                return
+                return True
 
         adj = me | me << 1 | me >> 1
         adj |= adj << W_plus_1 | adj >> W_plus_1
 
         hx, hy = self.home
         if ((x - hx) ^ (y - hy)) & 1:
-            def move(adj: int):
+            def move(adj: int) -> bool:
                 options: list[Direction] = []
                 if adj & (me >> W_plus_1):
                     if movement.can_move(Direction.NORTH):
@@ -59,7 +59,7 @@ class BfsNav(Nav):
 
                 if options:
                     movement.move(random.choice(options))
-                    return
+                    return True
 
                 if adj & (me >> (W_plus_1 + 1)):
                     if movement.can_move(Direction.NORTHWEST):
@@ -76,10 +76,12 @@ class BfsNav(Nav):
 
                 if options:
                     movement.move(random.choice(options))
+                    return True
                 else:
                     print("No path?")
+                    return False
         else:
-            def move(adj: int):
+            def move(adj: int) -> bool:
                 options: list[Direction] = []
                 if adj & (me >> (W_plus_1 + 1)):
                     if movement.can_move(Direction.NORTHWEST):
@@ -96,7 +98,7 @@ class BfsNav(Nav):
 
                 if options:
                     movement.move(random.choice(options))
-                    return
+                    return True
 
                 if adj & (me >> W_plus_1):
                     if movement.can_move(Direction.NORTH):
@@ -113,15 +115,16 @@ class BfsNav(Nav):
 
                 if options:
                     movement.move(random.choice(options))
+                    return True
                 else:
                     print("No path?")
+                    return False
 
         if target & not_unit & adj:
-            move(target & not_unit & adj)
-            return
+            return move(target & not_unit & adj)
 
         if (target & me) and active:
-            return
+            return True
 
         g: list[list[bool]] = [[p == 2 for p in row] for row in self.tile_manager.pass_grid]
         for row in g:
@@ -139,8 +142,7 @@ class BfsNav(Nav):
             seen &= pass_
 
             if seen & adj:
-                move(seen & adj)
-                return
+                return move(seen & adj)
 
         g: list[list[bool]] = [[True if p else False for p in row] for row in self.tile_manager.pass_grid]
         for row in g:
@@ -158,9 +160,10 @@ class BfsNav(Nav):
             seen &= pass_
 
             if seen & adj:
-                move(seen & adj)
-                return
+                return move(seen & adj)
+
         print("No path!")
+        return False
 
     CACHE = {
         (False, False, False, False, False, False, False, False): 0,

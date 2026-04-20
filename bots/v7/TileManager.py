@@ -24,6 +24,7 @@ class TileManager:
         self.empty_bitset: list[int] = [0] * H
         self.titanium_bitset: list[int] = [0] * H
         self.conveyor_bitset: list[int] = [0] * H
+        self.bridge_bitset: list[int] = [0] * H
         self.had_building_bitset: list[int] = [0] * H
         self.has_building_bitset: list[int] = [0] * H
         self.unit_bitset: list[int] = []
@@ -42,7 +43,6 @@ class TileManager:
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.has_kill_chamber: bool = False
         self.axionite_ores: set[Position] = set()
-        self.conveyors: set[Position] = set()
         self.gunners: dict[Position, list] = {}
         self.gunner_covered_grid: list[list[bool]] = []
         self.gunner_covered: int = 0
@@ -51,6 +51,7 @@ class TileManager:
         self.symmetry: int = 7
         self.my_ores: set[Position] = set()
         self.enemy_ores: set[Position] = set()
+        self.to_heal: set[Position] = set()
 
         x, y = home
         self.reach: int = 1 << (y * (W + 1) + x)
@@ -103,6 +104,7 @@ class TileManager:
         empty_bitset: list[int] = self.empty_bitset
         titanium_bitset: list[int] = self.titanium_bitset
         conveyor_bitset: list[int] = self.conveyor_bitset
+        bridge_bitset: list[int] = self.bridge_bitset
         had_building_bitset: list[int] = self.had_building_bitset
         has_building_bitset: list[int] = self.has_building_bitset
         unit_bitset = self.unit_bitset = [0] * H
@@ -143,8 +145,6 @@ class TileManager:
         wander_seen = wander.seen
         wander_unseen = wander.unseen
 
-        conveyors: set[Position] = self.conveyors
-
         gunners: dict[Position, list] = self.gunners
 
         dynamic_connectivity: DynamicConnectivity = self.dynamic_connectivity
@@ -153,6 +153,8 @@ class TileManager:
 
         my_ores: set[Position] = self.my_ores
         enemy_ores: set[Position] = self.enemy_ores
+
+        to_heal: set[Position] = {pos for pos in self.to_heal if not c.is_in_vision(pos) or c.get_hp(building_id := c.get_tile_building_id(pos)) < c.get_max_hp(building_id)}
 
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -228,27 +230,30 @@ class TileManager:
                     pass_grid[yi][xi] = 0
             else:
                 e_type: EntityType = get_entity_type(building_id)
+                team: Team = c.get_team(building_id)
                 if e_type == ROAD:
                     pass_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = 2
-                    if get_team(building_id) == my_team:
+                    if team == my_team:
                         buildable_bitset[yi] |= 1 << xi
                 elif e_type in CONVEYOR_VARIANT:
                     pass_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = 2
-                    if get_team(building_id) == my_team:
+                    if team == my_team:
+                        if c.get_hp(building_id) < c.get_max_hp(building_id):
+                            to_heal.add(pos)
                         env_grid[yi][xi] = 3
-                        conveyors.add(pos)
-                        conveyor_bitset[yi] |= 1 << xi
                         had_building_bitset[yi] |= 1 << xi
                         has_building_bitset[yi] |= 1 << xi
                         if e_type == EntityType.BRIDGE:
                             nxt: Position = c.get_bridge_target(building_id)
                             building_grid[yi][xi] = (e_type, nxt)
+                            bridge_bitset[yi] |= 1 << xi
                         else:
                             d: Direction = get_direction(building_id)
                             building_grid[yi][xi] = (e_type, d)
                             nxt = pos.add(d)
+                            conveyor_bitset[yi] |= 1 << xi
                         if U.on_the_map(nxt):
                             i: int = yi * W + xi
                             xj, yj = nxt
@@ -261,10 +266,14 @@ class TileManager:
                             wander.unseen.add(pos)
                 elif e_type == BARRIER:
                     pass_grid[yi][xi] = 0
-                    if get_team(building_id) == my_team:
+                    if team == my_team:
+                        if c.get_hp(building_id) < 30:
+                            to_heal.add(pos)
                         barrier_bitset[yi] |= 1 << xi
                 elif e_type == CORE:
-                    if get_team(building_id) == my_team:
+                    if team == my_team:
+                        if c.get_hp(building_id) < 500:
+                            to_heal.add(pos)
                         pass_bitset[yi] |= 1 << xi
                         pass_grid[yi][xi] = 2
                     else:
@@ -274,11 +283,13 @@ class TileManager:
                     buildable_bitset[yi] |= 1 << xi
                     pass_grid[yi][xi] = 1
                     if self.enemy_core is None:
-                        if get_team(building_id) == my_team:
+                        if team == my_team:
                             symmetry &= get_marker_value(building_id)
                 elif e_type == GUNNER:
                     pass_grid[yi][xi] = 0
-                    if get_team(building_id) == my_team:
+                    if team == my_team:
+                        if c.get_hp(building_id) < 40:
+                            to_heal.add(pos)
                         if pos in gunners:
                             gunners[pos][0] = get_direction(building_id)
                         else:
@@ -288,6 +299,9 @@ class TileManager:
                                 self.has_kill_chamber = True
                 else:
                     pass_grid[yi][xi] = 0
+                    if team == my_team:
+                        if c.get_hp(building_id) < c.get_max_hp(building_id):
+                            to_heal.add(pos)
 
             bb_id = get_tile_builder_bot_id(pos)
             if bb_id is not None:
@@ -347,6 +361,8 @@ class TileManager:
                     break
             else:
                 info[1] = True
+
+        self.to_heal = to_heal
 
         self.symmetry = symmetry
 

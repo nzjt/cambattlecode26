@@ -118,19 +118,6 @@ class BuilderBot(Unit):
             if c.is_in_vision(self.target):
                 if c.get_entity_type(c.get_tile_building_id(self.target)) in C.TURRET:
                     self.target_type = 0
-        elif self.target_type == 9:
-            if c.is_in_vision(self.target):
-                building_id = c.get_tile_building_id(self.target)
-                max_hp: int = c.get_max_hp(building_id)
-                if c.get_hp(building_id) == max_hp:
-                    self.target_type = 0
-                else:
-                    if c.can_heal(self.target):
-                        c.heal(self.target)
-                        self.movement.act(c)
-
-                    if c.get_hp(building_id) == max_hp:
-                        self.target_type = 0
 
         if self.target_type <= 2 and not self.must_patrol and not self.must_see_enemy_core:
             env: Environment = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
@@ -161,9 +148,7 @@ class BuilderBot(Unit):
                         break
         # TODO: settlement vs los smth
 
-        if self.target_type == 9:
-            pass
-        elif self.target_type == 8:
+        if self.target_type == 8:
             pass
         elif self.target_type == 7:
             pass
@@ -273,13 +258,7 @@ class BuilderBot(Unit):
                         self.ores.discard(pos)
 
                 e_type = c.get_entity_type(building_id)
-                if c.get_team(building_id) == my_team:
-                    if building_id is not None and e_type not in C.UNIMPORTANT:
-                        if c.get_hp(building_id) < c.get_max_hp(building_id):
-                            self.target = pos
-                            self.target_type = 9
-                            break
-                elif e_type in C.DANGEROUS:
+                if c.get_team(building_id) != my_team and e_type in C.DANGEROUS:
                     x, y = pos
                     if not self.tile_manager.gunner_covered_grid[y][x]:
                         for d in C.CARDINAL:
@@ -539,6 +518,33 @@ class BuilderBot(Unit):
                 my_pos = c.get_position()
                 try_repair()
                 self.target_type = ~self.target_type
+
+        to_heal: set[Position] = self.tile_manager.to_heal
+        if to_heal:
+            for pos in to_heal:
+                if c.can_heal(pos):
+                    c.heal(pos)
+                    self.movement.act(c)
+                    building_id = c.get_tile_building_id(pos)
+                    if c.get_hp(building_id) == c.get_max_hp(building_id):
+                        to_heal.remove(pos)
+                        break
+
+            if to_heal:
+                self.nav.multimove(c, list(to_heal), self.movement, adj=True, active=True)
+
+                for pos in to_heal:
+                    if c.can_heal(pos):
+                        c.heal(pos)
+                        self.movement.act(c)
+                        building_id = c.get_tile_building_id(pos)
+                        if c.get_hp(building_id) == c.get_max_hp(building_id):
+                            to_heal.remove(pos)
+                            break
+
+                if to_heal:
+                    self.target_type = ~self.target_type
+
         print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)
         if self.target_type < 0:
@@ -547,7 +553,10 @@ class BuilderBot(Unit):
             self.wander.update(c)
         elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
-            self.nav.move(c, self.target, self.movement)
+            if not self.nav.move(c, self.target, self.movement):
+                self.target_type = 0
+                self.must_patrol = True
+                self.wander.update(c)
         elif self.target_type == 2:
             if self.is_axionite:
                 if my_pos.distance_squared(self.target) > 2:
@@ -700,6 +709,7 @@ class BuilderBot(Unit):
             if self.target_type and dist:
                 self.nav.move(c, self.target, self.movement)
         elif self.target_type == 8:
+            # raise Exception("hah")
             self.conveyor_manager.update(c, self.movement, self.tile_manager, self.nav, False)
         elif self.target_type == 9:
             self.movement.enrich(c)
@@ -755,6 +765,6 @@ class BuilderBot(Unit):
                                 self.nav.move(c, my_pos, self.movement, adj=True, exc=True, active=True)
                                 break
 
-        self.communication_manager.mark(self.tile_manager.symmetry | self.target_type << 2)
+        self.communication_manager.mark(self.tile_manager.symmetry | self.target_type << 3)
 
         self.prev_resources = c.get_global_resources()[0]
