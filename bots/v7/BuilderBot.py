@@ -410,10 +410,6 @@ class BuilderBot(Unit):
 
         self.tile_manager.sense(c, self.home, self.wander)
         print(c.get_cpu_time_elapsed())
-        if self.target_type == 0:
-            if self.must_patrol:
-                if not self.wander.unseen:
-                    self.must_patrol = False
 
         self.sense(c)
         self.movement.upd(c)
@@ -421,13 +417,6 @@ class BuilderBot(Unit):
         if self.target_type == 1:
             if ~(self.tile_manager.pass_bitset[self.target.y] | self.tile_manager.buildable_bitset[self.target.y]) >> self.target.x & 1:
                 self.target_type = 0
-
-        if self.target_type == 0:
-            if not self.must_patrol:
-                self.target = self.exploration_manager.get_target(c, self.tile_manager)
-                if self.target is not None:
-                    self.target_type = 1
-                    self.expiry = c.get_current_round() + 260
 
         W: int = C.W
         W_plus_1: int = W + 1
@@ -449,6 +438,7 @@ class BuilderBot(Unit):
 
         if destroy_set:
             self.nav.multimove(c, sum(1 << (y * W_plus_1 + x) for x, y in destroy_set), self.movement, adj=True)
+            my_pos = c.get_position()
 
         try_destroy()
 
@@ -474,6 +464,7 @@ class BuilderBot(Unit):
 
             if to_heal:
                 self.nav.multimove(c, list(to_heal), self.movement, adj=True, active=True)
+                my_pos = c.get_position()
 
                 heal()
 
@@ -509,6 +500,7 @@ class BuilderBot(Unit):
             if lack_protection:
                 self.movement.enrich(c)
                 self.nav.multimove(c, list(lack_protection.keys()), self.movement)
+                my_pos = c.get_position()
                 build_barrier()
                 self.target_type = ~self.target_type
 
@@ -527,21 +519,30 @@ class BuilderBot(Unit):
                             break
             else:
                 self.nav.multimove(c, unharvested, self.movement, adj=True)
+                my_pos = c.get_position()
 
             self.target_type = ~self.target_type
 
         if self.target_type >= 0:
+            allowed: int = C.MAP_MASK
+            for mask in self.tile_manager.recently_built[-10:]:
+                allowed &= ~mask
+            for mask in self.tile_manager.me_built[-10:]:
+                allowed |= mask
+
             edge: tuple = ()
-            orphans: list[int] = self.tile_manager.network.orphans
+            orphans: int = sum(1 << (index + index // W) for index in self.tile_manager.network.orphans) & allowed
             if orphans:
-                edge: tuple = ConveyorManager.get_edge(self.tile_manager, sum(1 << (index + index // W) for index in orphans))
+                print("try orphans")
+                edge: tuple = ConveyorManager.get_edge(self.tile_manager, orphans)
 
             if not edge:
                 adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
                 adj_empty |= adj_empty << 1 | adj_empty >> 1 | adj_empty << W_plus_1 | adj_empty >> W_plus_1
-                adj_empty &= self.tile_manager["empty"]
+                adj_empty &= self.tile_manager["empty"] & allowed & ~self.tile_manager.enemy
 
                 if adj_empty:
+                    print("try empty ore")
                     edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty)
 
             if edge:
@@ -555,6 +556,7 @@ class BuilderBot(Unit):
                             if c.can_build_conveyor(pos, d):
                                 c.build_conveyor(pos, d)
                                 self.movement.act(c)
+                                self.tile_manager.allow(nxt)
                 else:
                     def try_build():
                         if U.can_afford("bridge"):
@@ -563,18 +565,21 @@ class BuilderBot(Unit):
                             if c.can_build_bridge(pos, nxt):
                                 c.build_bridge(pos, nxt)
                                 self.movement.act(c)
+                                self.tile_manager.allow(nxt)
 
                 try_build()
 
-                if my_pos.distance_squared(pos) <= 8:
+                if c.is_in_vision(pos):
                     building_id = c.get_tile_building_id(pos)
                     if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
                         self.nav.move(c, pos, self.movement)
+                        my_pos = c.get_position()
 
                         if c.can_fire(pos):
                             c.fire(pos)
                             self.movement.act(c)
 
+                if my_pos.distance_squared(pos) <= 8:
                     building_id = c.get_tile_building_id(nxt)
                     if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.DESTROY_ENEMY:
                         self.nav.move(c, pos, self.movement, adj=True, exc=True)
@@ -597,18 +602,29 @@ class BuilderBot(Unit):
 
                 self.target_type = ~self.target_type
 
+        ever_seen: int = self.tile_manager.conveyor | self.tile_manager.bridge
+        if self.target_type == 0:
+            if self.must_patrol:
+                if self.wander.seen == ever_seen:
+                    self.must_patrol = False
+
+            if not self.must_patrol:
+                self.target = self.exploration_manager.get_target(c, self.tile_manager)
+                if self.target is not None:
+                    self.target_type = 1
+                    self.expiry = c.get_current_round() + 260
+
         print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)
         if self.target_type < 0:
             self.target_type = ~self.target_type
         elif self.target_type == 0:
-            self.wander.update(c)
+            self.wander.update(c, ever_seen)
         elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
             if not self.nav.multimove(c, C.MAP_MASK & ~self.tile_manager.seen, self.movement, prefer=my_pos.direction_to(self.target)):
                 self.target_type = 0
-                self.must_patrol = True
-                self.wander.update(c)
+                self.wander.update(c, ever_seen)
         elif self.target_type == 2:
             if self.is_axionite:
                 if my_pos.distance_squared(self.target) > 2:
@@ -819,4 +835,5 @@ class BuilderBot(Unit):
 
         self.communication_manager.mark(self.tile_manager.symmetry | self.target_type << 3)
 
+        self.tile_manager.post_sense(c)
         self.prev_resources = c.get_global_resources()[0]

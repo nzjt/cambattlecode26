@@ -15,6 +15,7 @@ class TileManager:
         self.titanium_bitset: list[int] = [0] * H
         self.conveyor_bitset: list[int] = [0] * H
         self.bridge_bitset: list[int] = [0] * H
+        self.enemy_bitset: list[int] = [0] * H
         self.unit_bitset: list[int] = []
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
@@ -53,6 +54,20 @@ class TileManager:
         self.unharvested: set[Position] = set()
         self.enemy_turrets: list[Position] = []
 
+        self.conveyor: int = 0
+        self.bridge: int = 0
+        self.enemy: int = 0
+
+        self.recently_built: list[int] = []
+        self.me_built: list[int] = []
+
+        self.id_grid: list[list[int]] = [[0] * W for _ in range(H)]
+
+    def allow(self, pos: Position):
+        x, y = pos
+        print("allow", x, y)
+        self.me_built[-1] |= 1 << (y * (C.W + 1) + x)
+
     def see(self, x: int, y: int):
         W_plus_1: int = C.W + 1
         mask: int = self.vision_mask
@@ -86,12 +101,14 @@ class TileManager:
                 self.see_gun = True
 
         W, H = C.W, C.H
+        W_plus_1: int = W + 1
         pass_bitset: list[int] = self.pass_bitset
         buildable_bitset: list[int] = self.buildable_bitset
         empty_bitset: list[int] = self.empty_bitset
         titanium_bitset: list[int] = self.titanium_bitset
         conveyor_bitset: list[int] = self.conveyor_bitset
         bridge_bitset: list[int] = self.bridge_bitset
+        enemy_bitset: list[int] = self.enemy_bitset
         unit_bitset = self.unit_bitset = [0] * H
 
         ally, enemy = 0, 0
@@ -106,8 +123,7 @@ class TileManager:
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
 
-        wander_seen = wander.seen
-        wander_unseen = wander.unseen
+        wander_seen: int = wander.seen
 
         gunners: dict[Position, list] = self.gunners
 
@@ -133,6 +149,9 @@ class TileManager:
         raw_ores: list[Position] = []
         enemy_turrets: list[Position] = []
 
+        new_conveyor: int = 0
+
+        id_grid: list[list[int]] = self.id_grid
         print(c.get_cpu_time_elapsed())
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -170,24 +189,23 @@ class TileManager:
                             d: Direction = get_direction(building_id)
                             conveyor_bitset[yi] |= bit
                             target = pos.add(d)
-                            if c.is_in_vision(target):
-                                if c.get_entity_type(c.get_tile_building_id(target)) == EntityType.HARVESTER:
-                                    is_protection[pos] = target
                         else:
                             target: Position = c.get_bridge_target(building_id)
                             bridge_bitset[yi] |= bit
                         j: int = nxt[index]
                         if j >= 0:
                             adj[j].remove(index)
-                        xj, yj = target
-                        j: int = yj * W + xj
-                        nxt[index] = j
-                        adj[j].append(index)
+                        xk, yk = target
+                        k: int = yk * W + xk
+                        nxt[index] = k
+                        adj[k].append(index)
                         if my_pos.distance_squared(pos) <= 10:
-                            wander_seen.add(pos)
-                            wander_unseen.discard(pos)
-                        elif pos not in wander.seen:
-                            wander.unseen.add(pos)
+                            bit: int = 1 << (index + yi)
+                            wander_seen |= bit
+                        if building_id != id_grid[yi][xi]:
+                            new_conveyor |= 1 << (k + yk)
+                    else:
+                        enemy_bitset[yi] |= 1 << xi
                 elif e_type == BARRIER:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -195,6 +213,8 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
+                    else:
+                        enemy_bitset[yi] |= 1 << xi
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
@@ -205,6 +225,7 @@ class TileManager:
                             to_heal.add(pos)
                         pass_bitset[yi] |= 1 << xi
                     else:
+                        enemy_bitset[yi] |= 1 << xi
                         bit: int = 1 << xi
                         pass_bitset[yi] &= ~bit
                         buildable_bitset[yi] &= ~bit
@@ -234,6 +255,7 @@ class TileManager:
                                 self.has_kill_chamber = True
                     else:
                         enemy_turrets.append(pos)
+                        enemy_bitset[yi] |= 1 << xi
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
@@ -241,6 +263,7 @@ class TileManager:
                 elif e_type == EntityType.SENTINEL:
                     if team != my_team:
                         enemy_turrets.append(pos)
+                        enemy_bitset[yi] |= 1 << xi
                 else:
                     bit: int = 1 << xi
                     pass_bitset[yi] &= ~bit
@@ -248,6 +271,8 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
+                    else:
+                        enemy_bitset[yi] |= 1 << xi
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
@@ -292,18 +317,23 @@ class TileManager:
                 bot_tracker[bb_id] = (pos, lo, round)
         print(c.get_cpu_time_elapsed())
 
+        self.conveyor = self["conveyor"]
+        self.bridge = self["bridge"]
+        self.enemy = self["enemy"]
+        wander.seen = wander_seen
+
         self.network.update(c)
 
-        for pos in raw_ores:
-            for d in C.CARDINAL:
-                adj: Position = pos.add(d)
-                if U.is_visible(adj):
-                    b_id = get_tile_building_id(adj)
-                    if get_entity_type(b_id) == EntityType.CONVEYOR:
-                        if get_direction(b_id) == d.opposite():
-                            is_protection[adj] = pos
+        self.recently_built.append(new_conveyor)
+        self.me_built.append(0)
 
         for pos in raw_ores:
+            x, y = pos
+            for j in adj[y * W + x]:
+                is_protection[Position(j % W, j // W)] = pos
+
+        for pos in raw_ores:
+            t0 = c.get_cpu_time_elapsed()
             is_mine: bool = True
             has_space, has_conveyor = False, False
             empty_adj: set[Position] = set()
@@ -367,6 +397,7 @@ class TileManager:
             else:
                 empty_ore.add(pos)
                 unharvested.discard(pos)
+            print(pos, c.get_cpu_time_elapsed() - t0)
 
         print(c.get_cpu_time_elapsed())
         self.lack_protection = lack_protection
@@ -485,6 +516,13 @@ class TileManager:
         self.reach = reach
 
         self.enemy_turrets = enemy_turrets
+
+    def post_sense(self, c: Controller):
+        id_grid: list[list[int]] = self.id_grid
+        get_position = c.get_position
+        for building_id in c.get_nearby_buildings():
+            x, y = get_position(building_id)
+            id_grid[y][x] = building_id
 
     def __getitem__(self, item: str) -> int:
         bitset: list[int] = getattr(self, f"{item}_bitset")

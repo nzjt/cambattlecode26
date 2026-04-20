@@ -62,10 +62,13 @@ class ConveyorManager:
         W: int = C.W
         W_plus_1: int = W + 1
         pass_: int = tile_manager.reach
-        pass_ &= ~(tile_manager["conveyor"] | tile_manager["bridge"])
+        pass_ &= ~(tile_manager.conveyor | tile_manager.bridge)
         pass_ |= sum(
             1 << (y * W_plus_1 + x) for x, y in tile_manager.is_protection
         )
+
+        if not (pass_ & from_):
+            return ()
 
         cur: int = to
 
@@ -121,7 +124,7 @@ class ConveyorManager:
         W_plus_1 = C.W + 1
         pass_: int = tile_manager.reach
         if avoid_joining:
-            pass_ &= ~(tile_manager["conveyor"] | tile_manager["bridge"])
+            pass_ &= ~(tile_manager.conveyor | tile_manager.bridge)
         else:
             self.mode = 1
 
@@ -239,7 +242,7 @@ class ConveyorManager:
         if not adj:
             return []
 
-        seen: list[int] = [tile_manager["conveyor"]]
+        seen: list[int] = [tile_manager.conveyor]
         if seen[0] & adj:
             return []
 
@@ -315,7 +318,7 @@ class ConveyorManager:
         if not my_ores or not enemy_ores:
             return []
 
-        conveyor: int = tile_manager["conveyor"]
+        conveyor: int = tile_manager.conveyor
         pass_: int = tile_manager.reach & ~conveyor
 
         target: int = (my_ores << 1 | my_ores >> 1 | my_ores << W_plus_1 | my_ores >> W_plus_1) & pass_
