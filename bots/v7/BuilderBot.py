@@ -428,25 +428,6 @@ class BuilderBot(Unit):
             if not self.tile_manager.pass_grid[self.target.y][self.target.x]:
                 self.target_type = 0
 
-        core: Position = self.home
-        if not c.is_in_vision(core):
-            core = core.add(self.home.direction_to(my_pos))
-
-        heal_core: bool = False
-        if c.is_in_vision(core):
-            building_id = c.get_tile_building_id(core)
-            if c.get_hp(building_id) < c.get_max_hp(building_id):
-                self.nav.move(c, self.home, self.movement, adj=True)
-                heal_core = True
-                my_pos = c.get_position()
-
-        if heal_core:
-            target = self.home.add(self.home.direction_to(my_pos))
-            if c.can_heal(target):
-                c.heal(target)
-
-            return
-
         if self.target_type == 0:
             if not self.must_patrol:
                 self.target = self.exploration_manager.get_target(c, self.tile_manager)
@@ -522,26 +503,28 @@ class BuilderBot(Unit):
 
         to_heal: set[Position] = self.tile_manager.to_heal
         if to_heal:
-            for pos in to_heal:
-                if c.can_heal(pos):
-                    c.heal(pos)
+            def heal():
+                best: Position | None = None
+                max_diff: int = 4
+                for pos in to_heal:
+                    if c.can_heal(pos):
+                        building_id = c.get_tile_building_id(pos)
+                        diff: int = c.get_max_hp(building_id) - c.get_hp(building_id)
+                        if diff >= max_diff:
+                            best = pos
+                            max_diff = diff
+                if best is not None:
+                    c.heal(best)
                     self.movement.act(c)
-                    building_id = c.get_tile_building_id(pos)
-                    if c.get_hp(building_id) == c.get_max_hp(building_id):
-                        to_heal.remove(pos)
-                        break
+                    if max_diff == 4:
+                        to_heal.remove(best)
+
+            heal()
 
             if to_heal:
                 self.nav.multimove(c, list(to_heal), self.movement, adj=True, active=True)
 
-                for pos in to_heal:
-                    if c.can_heal(pos):
-                        c.heal(pos)
-                        self.movement.act(c)
-                        building_id = c.get_tile_building_id(pos)
-                        if c.get_hp(building_id) == c.get_max_hp(building_id):
-                            to_heal.remove(pos)
-                            break
+                heal()
 
                 if to_heal:
                     self.target_type = ~self.target_type
