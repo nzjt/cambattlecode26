@@ -35,13 +35,12 @@ class Network:
 
         bad = self.bad = [i < 0 for i in nxt]
 
-        def dfs(i: int):
-            if not bad[i]:
-                bad[i] = True
-                for j in adj[i]:
-                    dfs(j)
+        queue: list[int] = [i for i in range(W * C.H) if (j := nxt[i]) == -1 or j == -3]
+        for i in queue:
+            for j in adj[i]:
+                if not bad[j]:
+                    bad[j] = True
+                    queue.append(j)
 
         self.orphans = [i for i in range(W * C.H) if adj[i] and ((j := nxt[i]) == -1 or j >= 0 and nxt[j] == -3)]
-        for i in self.orphans:
-            dfs(i)
         self.childless = [i for i in range(W * C.H) if nxt[i] == -2]
