@@ -2,7 +2,7 @@ from cambc import *
 import consts as C
 import utils as U
 from Wander import Wander
-from DynamicConnectivity import DynamicConnectivity
+from Network import Network
 
 
 class TileManager:
@@ -47,11 +47,11 @@ class TileManager:
         self.gunner_covered_grid: list[list[bool]] = []
         self.gunner_covered: int = 0
         self.enemy_core: Position | None = None
-        self.dynamic_connectivity: DynamicConnectivity = DynamicConnectivity()
         self.symmetry: int = 7
         self.my_ores: set[Position] = set()
         self.enemy_ores: set[Position] = set()
         self.to_heal: set[Position] = set()
+        self.network: Network = Network(home)
 
         W_plus_1: int = W + 1
         mask: int = 0
@@ -67,6 +67,10 @@ class TileManager:
 
         x, y = home
         self.reach: int = 1 << (y * (W + 1) + x)
+
+        self.lack_protection: set[Position] = set()
+        self.empty_ore: set[Position] = set()
+        self.unharvested: set[Position] = set()
 
     def see(self, x: int, y: int):
         W_plus_1: int = C.W + 1
@@ -173,14 +177,22 @@ class TileManager:
 
         gunners: dict[Position, list] = self.gunners
 
-        dynamic_connectivity: DynamicConnectivity = self.dynamic_connectivity
-
         symmetry: int = self.symmetry
 
         my_ores: set[Position] = self.my_ores
         enemy_ores: set[Position] = self.enemy_ores
 
         to_heal: set[Position] = {pos for pos in self.to_heal if not c.is_in_vision(pos) or c.get_hp(building_id := c.get_tile_building_id(pos)) < c.get_max_hp(building_id)}
+
+        nxt: list[int] = self.network.nxt
+
+        lack_protection: set[Position] = {
+            pos for pos in self.lack_protection if not c.is_in_vision(pos) or (building_id := c.get_tile_building_id(pos)) is None or c.get_entity_type(building_id) != EntityType.BARRIER or c.get_team(building_id) != my_team
+        }
+        empty_ore: set[Position] = self.empty_ore
+        unharvested: set[Position] = self.unharvested
+
+        raw_ores: list[Position] = []
 
         for pos in c.get_nearby_tiles():
             xi, yi = pos
@@ -197,50 +209,49 @@ class TileManager:
                     is_mine: bool = True
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
-                    elif building_id is not None:
-                        e_type = get_entity_type(building_id)
-                        if e_type == EntityType.HARVESTER:
-                            if get_team(building_id) != my_team:
-                                is_mine = False
-                            self.build_harvester[yi][xi] = False
-                            if pos.distance_squared(my_pos) <= 13:
+                        empty_ore.discard(pos)
+                    else:
+                        has_space, has_conveyor = False, False
+                        empty_adj: set[Position] = set()
+                        for d in C.CARDINAL:
+                            cur: Position = pos.add(d)
+                            if U.is_visible(cur) and c.get_tile_env(cur) != Environment.WALL:
+                                b_id = c.get_tile_building_id(cur)
+                                if b_id is None:
+                                    has_space = True
+                                    empty_adj.add(cur)
+                                else:
+                                    if c.get_team(b_id) != my_team:
+                                        continue
+                                    e_type = c.get_entity_type(b_id)
+                                    if e_type in C.CONVEYOR_VARIANT:
+                                        has_conveyor = True
+                                    elif e_type in C.UNIMPORTANT:
+                                        has_space = True
+                                        empty_adj.add(cur)
+                        if building_id is None:
+                            unharvested.add(pos)
+                        else:
+                            unharvested.discard(pos)
+                            e_type = get_entity_type(building_id)
+                            if e_type == EntityType.HARVESTER:
+                                if get_team(building_id) != my_team:
+                                    is_mine = False
+                                self.build_harvester[yi][xi] = False
                                 if pos.distance_squared(home) > 5:
-                                    has_space, has_conveyor = False, False
-                                    for d in C.CARDINAL:
-                                        cur: Position = pos.add(d)
-                                        if U.on_the_map(cur):
-                                            b_id = c.get_tile_building_id(cur)
-                                            if b_id is None:
-                                                has_space |= c.get_tile_env(cur) == Environment.EMPTY
-                                            else:
-                                                if c.get_team(b_id) != my_team:
-                                                    continue
-                                                e_type = c.get_entity_type(b_id)
-                                                if e_type in C.CONVEYOR_VARIANT:
-                                                    has_conveyor = True
-                                                    break
-                                                elif e_type == EntityType.ROAD or e_type == EntityType.MARKER:
-                                                    has_space = True
                                     if not has_conveyor and has_space:
                                         self.build_harvester[yi][xi] = True
-                        i: int = y * W + x
-                        if i not in dynamic_connectivity.harvesters:
-                            for d in C.CARDINAL:
-                                cur: Position = pos.add(d)
-                                if U.is_visible(cur):
-                                    b_id = c.get_tile_building_id(cur)
-                                    if get_entity_type(b_id) in C.CONVEYOR_VARIANT and c.get_team(b_id) == my_team:
-                                        dynamic_connectivity.add_harvester(i)
-                                        xj, yj = cur
-                                        j: int = yj * W + xj
-                                        dynamic_connectivity.merge(i, j)
-                                        break
-                        if is_mine:
-                            my_ores.add(pos)
-                            enemy_ores.discard(pos)
-                        else:
-                            enemy_ores.add(pos)
-                            my_ores.discard(pos)
+                            else:
+                                unharvested.add(pos)
+                            if is_mine:
+                                my_ores.add(pos)
+                                enemy_ores.discard(pos)
+                                if has_conveyor:
+                                    lack_protection |= empty_adj
+                            else:
+                                enemy_ores.add(pos)
+                                my_ores.discard(pos)
+                        raw_ores.append(pos)
                 else:
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
@@ -274,19 +285,16 @@ class TileManager:
                         had_building_bitset[yi] |= 1 << xi
                         has_building_bitset[yi] |= 1 << xi
                         if e_type == EntityType.BRIDGE:
-                            nxt: Position = c.get_bridge_target(building_id)
-                            building_grid[yi][xi] = (e_type, nxt)
+                            target: Position = c.get_bridge_target(building_id)
+                            building_grid[yi][xi] = (e_type, target)
                             bridge_bitset[yi] |= 1 << xi
+                            xj, yj = target
                         else:
                             d: Direction = get_direction(building_id)
                             building_grid[yi][xi] = (e_type, d)
-                            nxt = pos.add(d)
                             conveyor_bitset[yi] |= 1 << xi
-                        if U.on_the_map(nxt):
-                            i: int = yi * W + xi
-                            xj, yj = nxt
-                            j: int = yj * W + xj
-                            dynamic_connectivity.merge(i, j)
+                            xj, yj = pos.add(d)
+                        nxt[yi * W + xi] = yj * W + xj
                         if my_pos.distance_squared(pos) <= 10:
                             wander_seen.add(pos)
                             wander_unseen.discard(pos)
@@ -347,6 +355,22 @@ class TileManager:
                 else:
                     lo = round
                 bot_tracker[bb_id] = (pos, lo, round)
+
+        for pos in raw_ores:
+            for d in C.CARDINAL:
+                adj: Position = pos.add(d)
+                xi, yi = adj
+                if 0 <= xi < W and 0 <= yi < H:
+                    if nxt[yi * W + xi] >= 0:
+                        empty_ore.discard(pos)
+                        break
+            else:
+                empty_ore.add(pos)
+                unharvested.discard(pos)
+
+        self.lack_protection = lack_protection
+
+        self.network.update()
 
         self.ally = ally & -0x100000000001
         self.enemy = enemy

@@ -119,38 +119,38 @@ class BuilderBot(Unit):
                 if c.get_entity_type(c.get_tile_building_id(self.target)) in C.TURRET:
                     self.target_type = 0
 
-        if self.target_type <= 2 and not self.must_patrol and not self.must_see_enemy_core:
-            env: Environment = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
-            for pos in c.get_nearby_tiles(2):
-                if c.get_tile_env(pos) == env and self.tile_manager.build_harvester[pos.y][pos.x]:
-                    for d in Direction:
-                        cur = pos.add(d)
-                        if U.is_visible(cur):
-                            bb_id = c.get_tile_builder_bot_id(cur)
-                            if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
-                                break
-                    else:
-                        enemy_core = self.tile_manager.enemy_core
-                        if enemy_core is not None and pos.distance_squared(enemy_core) <= pos.distance_squared(self.home):
-                            # Attack!
-                            self.conveyor_manager = ConveyorManager(self.nav, enemy_core)
-                        else:
-                            self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                        if self.is_axionite:
-                            self.conveyor_manager.generate_path(c, self.tile_manager, pos, 2)
-                            if not self.conveyor_manager.path:
-                                self.tile_manager.ban_harvester[pos.y][pos.x] = True
-                                continue
-                        else:
-                            self.conveyor_manager.generate_path(c, self.tile_manager, pos)
-                        self.target = pos
-                        self.target_type = 3
-                        break
+        # if self.target_type <= 2 and not self.must_patrol and not self.must_see_enemy_core:
+        #     env: Environment = Environment.ORE_AXIONITE if self.is_axionite else Environment.ORE_TITANIUM
+        #     for pos in c.get_nearby_tiles(2):
+        #         if c.get_tile_env(pos) == env and self.tile_manager.build_harvester[pos.y][pos.x]:
+        #             for d in Direction:
+        #                 cur = pos.add(d)
+        #                 if U.is_visible(cur):
+        #                     bb_id = c.get_tile_builder_bot_id(cur)
+        #                     if bb_id is not None and c.get_team(bb_id) == my_team and bb_id != my_id:
+        #                         break
+        #             else:
+        #                 enemy_core = self.tile_manager.enemy_core
+        #                 if enemy_core is not None and pos.distance_squared(enemy_core) <= pos.distance_squared(self.home):
+        #                     # Attack!
+        #                     self.conveyor_manager = ConveyorManager(self.nav, enemy_core)
+        #                 else:
+        #                     self.conveyor_manager = ConveyorManager(self.nav, self.home)
+        #                 if self.is_axionite:
+        #                     self.conveyor_manager.generate_path(c, self.tile_manager, pos, 2)
+        #                     if not self.conveyor_manager.path:
+        #                         self.tile_manager.ban_harvester[pos.y][pos.x] = True
+        #                         continue
+        #                 else:
+        #                     self.conveyor_manager.generate_path(c, self.tile_manager, pos)
+        #                 self.target = pos
+        #                 self.target_type = 3
+        #                 break
         # TODO: settlement vs los smth
 
-        if self.target_type == 8:
-            pass
-        elif self.target_type == 7:
+        # if self.target_type == 8:
+        #     pass
+        if self.target_type == 7:
             pass
         elif self.target_type == 5:
             pass
@@ -372,11 +372,11 @@ class BuilderBot(Unit):
                 else:
                     self.target_type = 0
 
-            if self.target_type < 2:
-                self.conveyor_manager = ConveyorManager(self.nav, self.home)
-                self.conveyor_manager.generate_path(c, self.tile_manager, None, 3)
-                if self.conveyor_manager.path:
-                    self.target_type = 8
+            # if self.target_type < 2:
+            #     self.conveyor_manager = ConveyorManager(self.nav, self.home)
+            #     self.conveyor_manager.generate_path(c, self.tile_manager, None, 3)
+            #     if self.conveyor_manager.path:
+            #         self.target_type = 8
 
     def run(self, c: Controller):
         super().run(c)
@@ -502,7 +502,7 @@ class BuilderBot(Unit):
                 self.target_type = ~self.target_type
 
         to_heal: set[Position] = self.tile_manager.to_heal
-        if to_heal:
+        if self.target_type >= 0 and to_heal:
             def heal():
                 best: Position | None = None
                 max_diff: int = 4
@@ -528,6 +528,75 @@ class BuilderBot(Unit):
 
                 if to_heal:
                     self.target_type = ~self.target_type
+
+        lack_protection: set[Position] = self.tile_manager.lack_protection
+        if 0 <= self.target_type <= 2 and lack_protection:
+            def build_barrier():
+                if U.can_afford("conveyor"):
+                    for pos in lack_protection:
+                        if pos.distance_squared(my_pos) <= 2:
+                            if c.can_destroy(pos):
+                                c.destroy(pos)
+                            if c.can_build_barrier(pos):
+                                c.build_barrier(pos)
+                                lack_protection.remove(pos)
+                                self.movement.act(c)
+                                break
+
+            build_barrier()
+
+            if lack_protection:
+                self.nav.multimove(c, list(lack_protection), self.movement, adj=True, exc=True)
+                build_barrier()
+                self.target_type = ~self.target_type
+
+        W: int = C.W
+        W_plus_1: int = W + 1
+        unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested)
+        if 0 <= self.target_type <= 2 and unharvested:
+            if U.can_afford("harvester"):
+                self.nav.multimove(c, unharvested, self.movement, adj=True, exc=True)
+
+                my_pos = c.get_position()
+                for pos in self.tile_manager.unharvested:
+                    if 1 <= pos.distance_squared(my_pos) <= 2:
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+                        if c.can_build_harvester(pos):
+                            c.build_harvester(pos)
+                            break
+            else:
+                self.nav.multimove(c, unharvested, self.movement, adj=True)
+
+            self.target_type = ~self.target_type
+
+        orphans: list[int] = self.tile_manager.network.orphans
+        if 0 <= self.target_type <= 2 and orphans:
+            self.nav.multimove(c, sum(1 << (index + index // W) for index in orphans), self.movement)
+
+            for index in orphans:
+                pos: Position = Position(index % W, index // W)
+                if pos.distance_squared(my_pos) <= 2:
+                    ConveyorManager.build_from(c, self.tile_manager, 1 << (index + index // W))
+                    break
+
+            self.target_type = ~self.target_type
+
+        adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
+        adj_empty |= adj_empty << 1 | adj_empty >> 1 | adj_empty << W_plus_1 | adj_empty >> W_plus_1
+        adj_empty &= self.tile_manager["buildable"] & self.tile_manager["empty"]
+        if 0 <= self.target_type <= 2 and adj_empty:
+            self.nav.multimove(c, adj_empty, self.movement)
+
+            x, y = my_pos = c.get_position()
+            adj: int = 1 << (y * W_plus_1 + x)
+            adj |= adj << 1 | adj >> 1
+            adj |= adj << W_plus_1 | adj >> W_plus_1
+
+            if adj & adj_empty:
+                ConveyorManager.build_from(c, self.tile_manager, 1 << ((adj & adj_empty).bit_length() - 1))
+
+            self.target_type = ~self.target_type
 
         print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)
