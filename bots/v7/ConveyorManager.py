@@ -167,7 +167,11 @@ class ConveyorManager:
         if seen[0] & adj:
             return []
 
-        pass_ &= ~(seen[0] | tile_manager["bridge"])
+        xi, yi = self.home
+        core: int = 1 << (yi * W_plus_1 + xi)
+        core |= core << 1 | core >> 1
+        core |= core << W_plus_1 | core >> W_plus_1
+        pass_ &= ~(seen[0] | tile_manager["bridge"] | core)
 
         while len(seen) < 100:
             cur: int = seen[-1]

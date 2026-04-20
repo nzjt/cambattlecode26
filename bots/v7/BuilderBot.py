@@ -198,6 +198,7 @@ class BuilderBot(Unit):
 
                 def is_good(i: int):
                     if (g := good[i]) is None:
+                        good[i] = False
                         g = good[i] = is_good(nxt[i])
                     return g
 
