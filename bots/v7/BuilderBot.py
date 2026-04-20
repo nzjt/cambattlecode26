@@ -553,7 +553,7 @@ class BuilderBot(Unit):
             self.wander.update(c)
         elif self.target_type == 1:
             c.draw_indicator_line(my_pos, self.target, 255, 0, 0)
-            if not self.nav.move(c, self.target, self.movement):
+            if not self.nav.multimove(c, C.MAP_MASK & ~self.tile_manager.seen, self.movement, prefer=my_pos.direction_to(self.target)):
                 self.target_type = 0
                 self.must_patrol = True
                 self.wander.update(c)

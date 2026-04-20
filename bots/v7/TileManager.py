@@ -53,8 +53,34 @@ class TileManager:
         self.enemy_ores: set[Position] = set()
         self.to_heal: set[Position] = set()
 
+        W_plus_1: int = W + 1
+        mask: int = 0
+        for row in (0x7c, 0xfe, 0x1ff, 0x1ff, 0x1ff, 0x1ff, 0x1ff, 0xfe, 0x7c):
+            mask = mask << W_plus_1 | row
+        self.vision_mask: int = mask
+        self.seen: int = 0
+        mask = 0x1ff
+        for _ in range(H):
+            mask |= mask << W_plus_1
+        self.left: int = mask
+        self.right: int = C.MAP_MASK & ~mask
+
         x, y = home
         self.reach: int = 1 << (y * (W + 1) + x)
+
+    def see(self, x: int, y: int):
+        W_plus_1: int = C.W + 1
+        mask: int = self.vision_mask
+        if y >= 4:
+            mask <<= (y - 4) * W_plus_1
+        else:
+            mask >>= (4 - y) * W_plus_1
+        if x < 4:
+            self.seen |= mask >> (4 - x) & self.left
+        elif x + 4 < C.W:
+            self.seen |= mask << (x - 4)
+        else:
+            self.seen |= mask << (x - 4) & self.right
 
     def get_vision(self, x: int, y: int, grid: list[int]) -> int:
         only_9 = 0x1ff
@@ -313,6 +339,7 @@ class TileManager:
                 dy = yi - my_pos.y
                 if team == my_team:
                     ally |= 1 << (dx + dy * 10 + 44)
+                    self.see(xi, yi)
                 else:
                     enemy |= 1 << (dx + dy * 10 + 44)
                 if bb_id in bot_tracker and bot_tracker[bb_id][0] == pos and bot_tracker[bb_id][2] == round - 1:
