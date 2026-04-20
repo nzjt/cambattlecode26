@@ -860,9 +860,10 @@ class ConveyorManager:
                                     if e_type in C.CONVEYOR:
                                         if c.get_direction(building_id) == d:
                                             break
+                                        continue
                                     elif e_type == EntityType.HARVESTER:
                                         break
-                                    candidate = d.opposite()
+                                    candidate = d
                             else:
                                 # TODO: what if None
                                 d = candidate
