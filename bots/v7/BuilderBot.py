@@ -256,15 +256,15 @@ class BuilderBot(Unit):
 
         unharvested: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.unharvested) & ~self.tile_manager["unit"]
         if 0 <= self.target_type <= 2 and unharvested:
-            if U.can_afford("harvester"):
-                stay: bool = False
-                if my_pos in self.tile_manager.unharvested:
-                    building_id = c.get_tile_building_id(my_pos)
-                    if c.get_team(building_id) != my_team:
-                        if c.can_fire(my_pos):
-                            c.fire(my_pos)
-                            stay = True
+            stay: bool = False
+            if my_pos in self.tile_manager.unharvested:
+                building_id = c.get_tile_building_id(my_pos)
+                if c.get_team(building_id) != my_team:
+                    if c.can_fire(my_pos):
+                        c.fire(my_pos)
+                        stay = True
 
+            if U.can_afford("harvester"):
                 self.nav.multimove(c, unharvested, self.movement, adj=True, exc=not stay)
 
                 my_pos = c.get_position()
@@ -284,7 +284,7 @@ class BuilderBot(Unit):
                             if c.can_fire(pos):
                                 c.fire(pos)
             else:
-                self.nav.multimove(c, unharvested, self.movement, adj=True)
+                self.nav.multimove(c, unharvested, self.movement)
                 my_pos = c.get_position()
 
             self.target_type = ~self.target_type
@@ -314,38 +314,6 @@ class BuilderBot(Unit):
 
             if edge:
                 pos, nxt = edge
-                if pos.distance_squared(nxt) == 1:
-                    def try_build():
-                        if U.can_afford("conveyor"):
-                            if c.can_destroy(pos):
-                                c.destroy(pos)
-                            d: Direction = pos.direction_to(nxt)
-                            if c.can_build_conveyor(pos, d):
-                                c.build_conveyor(pos, d)
-                                self.movement.act(c)
-                                self.tile_manager.allow(nxt)
-                else:
-                    def try_build():
-                        if U.can_afford("bridge"):
-                            if c.can_destroy(pos):
-                                c.destroy(pos)
-                            if c.can_build_bridge(pos, nxt):
-                                c.build_bridge(pos, nxt)
-                                self.movement.act(c)
-                                self.tile_manager.allow(nxt)
-
-                try_build()
-
-                if c.is_in_vision(pos):
-                    building_id = c.get_tile_building_id(pos)
-                    if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
-                        self.nav.move(c, pos, self.movement)
-                        my_pos = c.get_position()
-
-                        if c.can_fire(pos):
-                            c.fire(pos)
-                            self.movement.act(c)
-
                 if my_pos.distance_squared(pos) <= 8:
                     building_id = c.get_tile_building_id(nxt)
                     if c.get_team(building_id) != my_team and c.get_entity_type(building_id) not in C.UNIMPORTANT:
@@ -359,13 +327,43 @@ class BuilderBot(Unit):
                             if c.can_build_gunner(pos, d):
                                 c.build_gunner(pos, d)
                     else:
+                        if pos.distance_squared(nxt) == 1:
+                            def try_build():
+                                if U.can_afford("conveyor"):
+                                    if c.can_destroy(pos):
+                                        c.destroy(pos)
+                                    d: Direction = pos.direction_to(nxt)
+                                    if c.can_build_conveyor(pos, d):
+                                        c.build_conveyor(pos, d)
+                                        self.movement.act(c)
+                                        self.tile_manager.allow(nxt)
+                        else:
+                            def try_build():
+                                if U.can_afford("bridge"):
+                                    if c.can_destroy(pos):
+                                        c.destroy(pos)
+                                    if c.can_build_bridge(pos, nxt):
+                                        c.build_bridge(pos, nxt)
+                                        self.movement.act(c)
+                                        self.tile_manager.allow(nxt)
+
+                        try_build()
+
                         self.nav.move(c, pos, self.movement)
                         my_pos = c.get_position()
+
+                        if c.is_in_vision(pos):
+                            building_id = c.get_tile_building_id(pos)
+                            if c.get_team(building_id) != my_team and c.get_entity_type(building_id) != EntityType.MARKER:
+                                if c.can_fire(pos):
+                                    c.fire(pos)
+                                    self.movement.act(c)
+
+
+                        try_build()
                 else:
                     self.nav.move(c, pos, self.movement)
                     my_pos = c.get_position()
-
-                try_build()
 
                 self.target_type = ~self.target_type
             elif orphans:

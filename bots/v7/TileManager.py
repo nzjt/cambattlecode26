@@ -65,7 +65,6 @@ class TileManager:
 
     def allow(self, pos: Position):
         x, y = pos
-        print("allow", x, y)
         self.me_built[-1] |= 1 << (y * (C.W + 1) + x)
 
     def see(self, x: int, y: int):
@@ -110,6 +109,28 @@ class TileManager:
         bridge_bitset: list[int] = self.bridge_bitset
         enemy_bitset: list[int] = self.enemy_bitset
         unit_bitset = self.unit_bitset = [0] * H
+
+        x, y = my_pos
+        if x >= 4:
+            shift = x - 4
+            for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
+                if 0 <= yi < H:
+                    mask = ~(mask << shift)
+                    pass_bitset[yi] &= mask
+                    buildable_bitset[yi] &= mask
+                    enemy_bitset[yi] &= mask
+                    conveyor_bitset[yi] &= mask
+                    bridge_bitset[yi] &= mask
+        else:
+            shift = 4 - x
+            for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
+                if 0 <= yi < H:
+                    mask = ~(mask >> shift)
+                    pass_bitset[yi] &= mask
+                    buildable_bitset[yi] &= mask
+                    enemy_bitset[yi] &= mask
+                    conveyor_bitset[yi] &= mask
+                    bridge_bitset[yi] &= mask
 
         ally, enemy = 0, 0
         ROAD = EntityType.ROAD
@@ -180,7 +201,6 @@ class TileManager:
                     if j >= 0:
                         adj[j].remove(index)
                         nxt[index] = -1
-                    enemy_bitset[yi] &= ~bit
                 elif e_type in CONVEYOR_VARIANT:
                     pass_bitset[yi] |= bit
                     if team == my_team:
@@ -205,7 +225,6 @@ class TileManager:
                             wander_seen |= bit
                         if building_id != id_grid[yi][xi]:
                             new_conveyor |= 1 << (k + yk)
-                        enemy_bitset[yi] &= ~bit
                     else:
                         enemy_bitset[yi] |= bit
                 elif e_type == BARRIER:
@@ -214,7 +233,6 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
-                        enemy_bitset[yi] &= ~bit
                     else:
                         enemy_bitset[yi] |= bit
                         dangerous.append(pos)
@@ -233,7 +251,6 @@ class TileManager:
                         self.enemy_core = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= bit
-                    enemy_bitset[yi] &= ~bit
                     if self.enemy_core is None:
                         if team == my_team:
                             symmetry &= get_marker_value(building_id)
@@ -254,7 +271,6 @@ class TileManager:
                         if pos.distance_squared(self.home) <= 8:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
-                        enemy_bitset[yi] &= ~bit
                     else:
                         dangerous.append(pos)
                         enemy_bitset[yi] |= bit
@@ -263,9 +279,7 @@ class TileManager:
                         adj[j].remove(index)
                         nxt[index] = -1
                 elif e_type == EntityType.SENTINEL:
-                    if team == my_team:
-                        enemy_bitset[yi] &= ~bit
-                    else:
+                    if team != my_team:
                         dangerous.append(pos)
                         enemy_bitset[yi] |= bit
                     j: int = nxt[index]
@@ -278,7 +292,6 @@ class TileManager:
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
-                        enemy_bitset[yi] &= ~bit
                     else:
                         enemy_bitset[yi] |= bit
                     j: int = nxt[index]
@@ -324,6 +337,8 @@ class TileManager:
                     lo = round
                 bot_tracker[bb_id] = (pos, lo, round)
         print(c.get_cpu_time_elapsed())
+
+        unit_bitset[y] &= ~(1 << x)
 
         self.conveyor = self["conveyor"]
         self.bridge = self["bridge"]
