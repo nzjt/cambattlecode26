@@ -5,8 +5,6 @@ from Movement import Movement
 from Nav import Nav
 from ConveyorManager import ConveyorManager
 from TileManager import TileManager
-from Bfs import Bfs
-from FoundryManager import FoundryManager
 import consts as C
 import utils as U
 from BfsNav import BfsNav
@@ -22,7 +20,6 @@ class BuilderBot(Unit):
         self.birth = c.get_current_round()
         self.home = c.get_position(c.get_tile_building_id(c.get_position()))
         self.tile_manager = TileManager(self.home)
-        self.bfs = Bfs(self.home, self.tile_manager)
         self.nav: Nav = BfsNav(self.home, self.tile_manager)
         self.prev_resources = c.get_global_resources()[0]
         self.movement: Movement = Movement()
@@ -87,8 +84,7 @@ class BuilderBot(Unit):
 
         if self.target_type == 4:
             dist = my_pos.distance_squared(self.target)
-            xi, yi = self.target
-            if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
+            if dist <= 13:
                 self.target_type = 0
                 building_id = c.get_tile_building_id(self.target)
                 if c.get_team(building_id) != my_team and c.get_entity_type(building_id) == EntityType.HARVESTER:
@@ -212,8 +208,7 @@ class BuilderBot(Unit):
                 dist = my_pos.distance_squared(pos)
                 if env == Environment.ORE_TITANIUM:
                     if c.get_entity_type(building_id) == EntityType.HARVESTER:
-                        xi, yi = pos
-                        if dist <= 13 and self.bfs.can_reach_adj(xi - x, yi - y):
+                        if dist <= 13:
                             has_space, has_enemy = False, False
                             for d in C.CARDINAL:
                                 nxt = pos.add(d)
@@ -414,7 +409,6 @@ class BuilderBot(Unit):
                 self.target_type = 0
 
         self.tile_manager.sense(c, self.home, self.wander)
-        self.bfs.update(c, self.conveyor_manager)
         print(c.get_cpu_time_elapsed())
         if self.target_type == 0:
             if self.must_patrol:
@@ -425,7 +419,7 @@ class BuilderBot(Unit):
         self.movement.upd(c)
         print(c.get_cpu_time_elapsed())
         if self.target_type == 1:
-            if not self.tile_manager.pass_grid[self.target.y][self.target.x]:
+            if ~(self.tile_manager.pass_bitset[self.target.y] | self.tile_manager.buildable_bitset[self.target.y]) >> self.target.x & 1:
                 self.target_type = 0
 
         if self.target_type == 0:
@@ -515,14 +509,13 @@ class BuilderBot(Unit):
             if not edge:
                 adj_empty: int = sum(1 << (y * W_plus_1 + x) for x, y in self.tile_manager.empty_ore)
                 adj_empty |= adj_empty << 1 | adj_empty >> 1 | adj_empty << W_plus_1 | adj_empty >> W_plus_1
-                adj_empty &= self.tile_manager["buildable"] & self.tile_manager["empty"]
+                adj_empty &= self.tile_manager["empty"]
 
                 if adj_empty:
                     edge: tuple = ConveyorManager.get_edge(self.tile_manager, adj_empty)
 
             if edge:
                 pos, nxt = edge
-                built: bool = False
                 if pos.distance_squared(nxt) == 1:
                     if U.can_afford("conveyor"):
                         if c.can_destroy(pos):
@@ -531,18 +524,16 @@ class BuilderBot(Unit):
                         if c.can_build_conveyor(pos, d):
                             c.build_conveyor(pos, d)
                             self.movement.act(c)
-                            built = True
 
-                    if not built:
-                        self.nav.move(c, pos, self.movement)
+                    self.nav.move(c, pos, self.movement)
 
-                        if U.can_afford("conveyor"):
-                            if c.can_destroy(pos):
-                                c.destroy(pos)
-                            d: Direction = pos.direction_to(nxt)
-                            if c.can_build_conveyor(pos, d):
-                                c.build_conveyor(pos, d)
-                                self.movement.act(c)
+                    if U.can_afford("conveyor"):
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+                        d: Direction = pos.direction_to(nxt)
+                        if c.can_build_conveyor(pos, d):
+                            c.build_conveyor(pos, d)
+                            self.movement.act(c)
                 else:
                     if U.can_afford("bridge"):
                         if c.can_destroy(pos):
@@ -550,17 +541,15 @@ class BuilderBot(Unit):
                         if c.can_build_bridge(pos, nxt):
                             c.build_bridge(pos, nxt)
                             self.movement.act(c)
-                            built = True
 
-                    if not built:
-                        self.nav.move(c, pos, self.movement)
+                    self.nav.move(c, pos, self.movement)
 
-                        if U.can_afford("bridge"):
-                            if c.can_destroy(pos):
-                                c.destroy(pos)
-                            if c.can_build_bridge(pos, nxt):
-                                c.build_bridge(pos, nxt)
-                                self.movement.act(c)
+                    if U.can_afford("bridge"):
+                        if c.can_destroy(pos):
+                            c.destroy(pos)
+                        if c.can_build_bridge(pos, nxt):
+                            c.build_bridge(pos, nxt)
+                            self.movement.act(c)
 
                 self.target_type = ~self.target_type
 

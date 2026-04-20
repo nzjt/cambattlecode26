@@ -19,6 +19,6 @@ class ExplorationManager:
         W_minus_1, H_minus_1 = C.W - 1, C.H - 1
         for _ in range(10):
             target = Position(random.randint(0, W_minus_1), random.randint(0, H_minus_1))
-            if not c.is_in_vision(target) and tile_manager.pass_grid[target.y][target.x]:
+            if not c.is_in_vision(target) and ((tile_manager.pass_bitset[target.y] | tile_manager.buildable_bitset[target.y]) >> target.x & 1):
                 return target
         return None

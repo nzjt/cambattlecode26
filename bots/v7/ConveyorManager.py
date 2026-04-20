@@ -2,7 +2,6 @@ import random
 from cambc import *
 from TileManager import TileManager
 from Movement import Movement
-from Bfs import Bfs
 import utils as U
 import consts as C
 from Nav import Nav

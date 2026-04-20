@@ -21,6 +21,7 @@ MONOCHILD_CONVEYOR = {
     EntityType.ARMOURED_CONVEYOR,
     EntityType.BRIDGE
 }
+DIRECTED_CONVEYOR = CONVEYOR | {EntityType.SPLITTER}
 TURRET = {
     EntityType.GUNNER,
     EntityType.SENTINEL,

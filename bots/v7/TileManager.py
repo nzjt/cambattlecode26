@@ -6,39 +6,18 @@ from Network import Network
 
 
 class TileManager:
-    ENV_MAP = {
-        Environment.WALL: 1,
-        Environment.EMPTY: 2,
-        Environment.ORE_TITANIUM: 4,
-        Environment.ORE_AXIONITE: 5
-    }
-
     def __init__(self, home: Position):
         W, H = C.W, C.H
-        H_plus_4 = H + 4
         self.home: Position = home
-        self.pass_bitset: list[int] = [0] * H_plus_4
-        self.buildable_bitset: list[int] = [0] * H_plus_4
-        self.barrier_bitset: list[int] = [0] * H_plus_4
-        self.ore_bitset: list[int] = [0] * H_plus_4
+        self.pass_bitset: list[int] = [0] * H
+        self.buildable_bitset: list[int] = [(1 << W) - 1] * H
         self.empty_bitset: list[int] = [0] * H
         self.titanium_bitset: list[int] = [0] * H
         self.conveyor_bitset: list[int] = [0] * H
         self.bridge_bitset: list[int] = [0] * H
-        self.had_building_bitset: list[int] = [0] * H
-        self.has_building_bitset: list[int] = [0] * H
         self.unit_bitset: list[int] = []
-        self.building_grid: list[list[tuple[EntityType, ...] | None]] = [[None] * W for _ in range(H)]
-        self.ally: int = 0
-        self.enemy: int = 0
-        self.pass_: int = 0
-        self.ore: int = 0
-        self.buildable: int = 0
-        self.barrier: int = 0
         self.build_harvester = [[True] * W for _ in range(H)]
         self.ban_harvester = [[False] * W for _ in range(H)]
-        self.env_grid = [[0] * W for _ in range(H)]
-        self.pass_grid: list[list[int]] = [[1] * W for _ in range(H)]
         self.see_gun: bool = False
         self.bot_tracker: dict[int, tuple[Position, int, int]] = {}
         self.has_kill_chamber: bool = False
@@ -87,31 +66,6 @@ class TileManager:
         else:
             self.seen |= mask << (x - 4) & self.right
 
-    def get_vision(self, x: int, y: int, grid: list[int]) -> int:
-        only_9 = 0x1ff
-        if x >= 4:
-            shift = x - 4
-            return (grid[y - 4] >> shift & only_9 |
-                    (grid[y - 3] >> shift & only_9) << 10 |
-                    (grid[y - 2] >> shift & only_9) << 20 |
-                    (grid[y - 1] >> shift & only_9) << 30 |
-                    (grid[y] >> shift & only_9) << 40 |
-                    (grid[y + 1] >> shift & only_9) << 50 |
-                    (grid[y + 2] >> shift & only_9) << 60 |
-                    (grid[y + 3] >> shift & only_9) << 70 |
-                    (grid[y + 4] >> shift & only_9) << 80)
-        else:
-            shift = 4 - x
-            return (grid[y - 4] << shift & only_9 |
-                    (grid[y - 3] << shift & only_9) << 10 |
-                    (grid[y - 2] << shift & only_9) << 20 |
-                    (grid[y - 1] << shift & only_9) << 30 |
-                    (grid[y] << shift & only_9) << 40 |
-                    (grid[y + 1] << shift & only_9) << 50 |
-                    (grid[y + 2] << shift & only_9) << 60 |
-                    (grid[y + 3] << shift & only_9) << 70 |
-                    (grid[y + 4] << shift & only_9) << 80)
-
     def sense(self, c: Controller, home: Position, wander: Wander):
         get_tile_building_id = c.get_tile_building_id
         get_tile_env = c.get_tile_env
@@ -131,44 +85,22 @@ class TileManager:
                 self.see_gun = True
 
         W, H = C.W, C.H
-        pass_bitset, buildable_bitset, ore_bitset, barrier_bitset = self.pass_bitset, self.buildable_bitset, self.ore_bitset, self.barrier_bitset
+        pass_bitset: list[int] = self.pass_bitset
+        buildable_bitset: list[int] = self.buildable_bitset
         empty_bitset: list[int] = self.empty_bitset
         titanium_bitset: list[int] = self.titanium_bitset
         conveyor_bitset: list[int] = self.conveyor_bitset
         bridge_bitset: list[int] = self.bridge_bitset
-        had_building_bitset: list[int] = self.had_building_bitset
-        has_building_bitset: list[int] = self.has_building_bitset
         unit_bitset = self.unit_bitset = [0] * H
-        env_grid, pass_grid = self.env_grid, self.pass_grid
-        building_grid: list[list[tuple[EntityType, ...] | None]] = self.building_grid
-        x, y = my_pos
-        if x >= 4:
-            shift = x - 4
-            for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
-                if 0 <= yi < H:
-                    mask = ~(mask << shift)
-                    pass_bitset[yi] &= mask
-                    buildable_bitset[yi] &= mask
-                    barrier_bitset[yi] &= mask
-                    has_building_bitset[yi] &= mask
-        else:
-            shift = 4 - x
-            for mask, yi in [(0x7c, y - 4), (0xfe, y - 3), (0x1ff, y - 2), (0x1ff, y - 1), (0x1ff, y), (0x1ff, y + 1), (0x1ff, y + 2), (0xfe, y + 3), (0x7c, y + 4)]:
-                if 0 <= yi < H:
-                    mask = ~(mask >> shift)
-                    pass_bitset[yi] &= mask
-                    buildable_bitset[yi] &= mask
-                    barrier_bitset[yi] &= mask
-                    has_building_bitset[yi] &= mask
 
         ally, enemy = 0, 0
         ROAD = EntityType.ROAD
         BARRIER = EntityType.BARRIER
         MARKER = EntityType.MARKER
         CORE = EntityType.CORE
-        ENV_MAP = TileManager.ENV_MAP
         GUNNER = EntityType.GUNNER
         CONVEYOR_VARIANT = C.CONVEYOR_VARIANT
+        DIRECTED_CONVEYOR = C.DIRECTED_CONVEYOR
 
         bot_tracker = self.bot_tracker
         round = c.get_current_round()
@@ -198,17 +130,16 @@ class TileManager:
 
         raw_ores: list[Position] = []
 
+        print(c.get_cpu_time_elapsed())
         for pos in c.get_nearby_tiles():
             xi, yi = pos
 
             building_id = get_tile_building_id(pos)
-            env: int = ENV_MAP[get_tile_env(pos)]
-            env_grid[yi][xi] = env
-            if env == 2:
+            env: Environment = get_tile_env(pos)
+            if env == Environment.EMPTY:
                 empty_bitset[yi] |= 1 << xi
-            elif env >= 4:
-                ore_bitset[yi] |= 1 << xi
-                if env == 4:
+            elif env != Environment.WALL:
+                if env == Environment.ORE_TITANIUM:
                     titanium_bitset[yi] |= 1 << xi
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
@@ -225,40 +156,33 @@ class TileManager:
                     else:
                         self.axionite_ores.add(pos)
             if building_id is None:
-                if env >= 2:
-                    buildable_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = 1
+                bit: int = 1 << xi
+                pass_bitset[yi] &= ~bit
+                if env != Environment.WALL:
+                    buildable_bitset[yi] |= bit
                 else:
-                    pass_grid[yi][xi] = 0
+                    buildable_bitset[yi] &= ~bit
             else:
                 e_type: EntityType = get_entity_type(building_id)
                 team: Team = c.get_team(building_id)
                 if e_type == ROAD:
                     pass_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = 2
-                    if team == my_team:
-                        buildable_bitset[yi] |= 1 << xi
                 elif e_type in CONVEYOR_VARIANT:
-                    pass_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = 2
+                    bit: int = 1 << xi
+                    pass_bitset[yi] |= bit
                     if team == my_team:
-                        if c.get_hp(building_id) < c.get_max_hp(building_id):
+                        if c.get_hp(building_id) < 20:
                             to_heal.add(pos)
-                        env_grid[yi][xi] = 3
-                        had_building_bitset[yi] |= 1 << xi
-                        has_building_bitset[yi] |= 1 << xi
-                        if e_type == EntityType.BRIDGE:
-                            target: Position = c.get_bridge_target(building_id)
-                            building_grid[yi][xi] = (e_type, target)
-                            bridge_bitset[yi] |= 1 << xi
-                        else:
+                        if e_type in DIRECTED_CONVEYOR:
                             d: Direction = get_direction(building_id)
-                            building_grid[yi][xi] = (e_type, d)
-                            conveyor_bitset[yi] |= 1 << xi
+                            conveyor_bitset[yi] |= bit
                             target = pos.add(d)
                             if c.is_in_vision(target):
                                 if c.get_entity_type(c.get_tile_building_id(target)) == EntityType.HARVESTER:
                                     is_protection[pos] = target
+                        else:
+                            target: Position = c.get_bridge_target(building_id)
+                            bridge_bitset[yi] |= bit
                         xj, yj = target
                         nxt[yi * W + xi] = yj * W + xj
                         if my_pos.distance_squared(pos) <= 10:
@@ -267,28 +191,31 @@ class TileManager:
                         elif pos not in wander.seen:
                             wander.unseen.add(pos)
                 elif e_type == BARRIER:
-                    pass_grid[yi][xi] = 0
+                    bit: int = 1 << xi
+                    pass_bitset[yi] &= ~bit
+                    buildable_bitset[yi] &= ~bit
                     if team == my_team:
                         if c.get_hp(building_id) < 30:
                             to_heal.add(pos)
-                        barrier_bitset[yi] |= 1 << xi
                 elif e_type == CORE:
                     if team == my_team:
                         if c.get_hp(building_id) < 500:
                             to_heal.add(pos)
                         pass_bitset[yi] |= 1 << xi
-                        pass_grid[yi][xi] = 2
                     else:
-                        pass_grid[yi][xi] = 0
+                        bit: int = 1 << xi
+                        pass_bitset[yi] &= ~bit
+                        buildable_bitset[yi] &= ~bit
                         self.enemy_core = c.get_position(building_id)
                 elif e_type == MARKER:
                     buildable_bitset[yi] |= 1 << xi
-                    pass_grid[yi][xi] = 1
                     if self.enemy_core is None:
                         if team == my_team:
                             symmetry &= get_marker_value(building_id)
                 elif e_type == GUNNER:
-                    pass_grid[yi][xi] = 0
+                    bit: int = 1 << xi
+                    pass_bitset[yi] &= ~bit
+                    buildable_bitset[yi] &= ~bit
                     if team == my_team:
                         if c.get_hp(building_id) < 40:
                             to_heal.add(pos)
@@ -300,7 +227,9 @@ class TileManager:
                             if pos.add(c.get_direction(building_id)).distance_squared(self.home) <= 8:
                                 self.has_kill_chamber = True
                 else:
-                    pass_grid[yi][xi] = 0
+                    bit: int = 1 << xi
+                    pass_bitset[yi] &= ~bit
+                    buildable_bitset[yi] &= ~bit
                     if team == my_team:
                         if c.get_hp(building_id) < c.get_max_hp(building_id):
                             to_heal.add(pos)
@@ -321,8 +250,18 @@ class TileManager:
                 else:
                     lo = round
                 bot_tracker[bb_id] = (pos, lo, round)
+        print(c.get_cpu_time_elapsed())
 
         self.network.update()
+
+        for pos in raw_ores:
+            for d in C.CARDINAL:
+                adj: Position = pos.add(d)
+                if U.is_visible(adj):
+                    b_id = get_tile_building_id(adj)
+                    if get_entity_type(b_id) == EntityType.CONVEYOR:
+                        if get_direction(b_id) == d.opposite():
+                            is_protection[adj] = pos
 
         for pos in raw_ores:
             is_mine: bool = True
@@ -386,15 +325,9 @@ class TileManager:
                 empty_ore.add(pos)
                 unharvested.discard(pos)
 
+        print(c.get_cpu_time_elapsed())
         self.lack_protection = lack_protection
         self.is_protection = is_protection
-
-        self.ally = ally & -0x100000000001
-        self.enemy = enemy
-        self.pass_ = self.get_vision(x, y, self.pass_bitset)
-        self.buildable = self.get_vision(x, y, self.buildable_bitset)
-        self.ore = self.get_vision(x, y, self.ore_bitset)
-        self.barrier = self.get_vision(x, y, self.barrier_bitset)
 
         self.gunners = {
             k: v for k, v in gunners.items() if not c.is_in_vision(k) or ((building_id := get_tile_building_id(k)) is not None and get_entity_type(building_id) == EntityType.GUNNER and get_team(building_id) == my_team)
