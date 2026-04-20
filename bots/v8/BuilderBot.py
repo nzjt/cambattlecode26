@@ -14,6 +14,7 @@ from Wander import Wander
 from CommunicationManager import CommunicationManager
 from ExplorationManager import ExplorationManager
 from StalkerManager import StalkerManager
+from OffenceManager import OffenceManager
 
 
 class BuilderBot(Unit):
@@ -46,6 +47,7 @@ class BuilderBot(Unit):
         self.exploration_manager: ExplorationManager = ExplorationManager()
         self.stalker_manager: StalkerManager = StalkerManager()
         self.must_see_enemy_core: bool = False
+        self.offence_manager: OffenceManager | None = None
 
         target: Position = c.get_position()
         d: Direction = self.home.direction_to(target)
@@ -528,6 +530,15 @@ class BuilderBot(Unit):
 
                 if to_heal:
                     self.target_type = ~self.target_type
+
+        if self.target_type >= 0 and self.target_type != 3 and self.target_type != 8 and self.target_type != 9:
+            self.offence_manager = OffenceManager(c)
+            if self.offence_manager.candidate:
+                self.target_type = 10
+
+        if self.target_type == 10:
+            if not self.offence_manager.update(c, self.nav, self.movement):
+                self.target_type = 0
 
         print(c.get_cpu_time_elapsed())
         print(self.target_type, self.target)

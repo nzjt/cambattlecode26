@@ -23,7 +23,7 @@ class Core(Unit):
         super().run(c)
         my_pos = c.get_position(c.get_id())
 
-        if c.get_current_round() <= 1900:
+        if c.get_current_round() <= 1000:
             ti, ax = c.get_global_resources()
             needed_titanium: int = c.get_builder_bot_cost()[0] - ti
             if needed_titanium > 0:
