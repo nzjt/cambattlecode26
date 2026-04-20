@@ -52,7 +52,7 @@ class TileManager:
         self.lack_protection: dict[Position, Position] = {}
         self.empty_ore: set[Position] = set()
         self.unharvested: set[Position] = set()
-        self.enemy_turrets: list[Position] = []
+        self.to_destroy: set[Position] = set()
 
         self.conveyor: int = 0
         self.bridge: int = 0
@@ -147,7 +147,7 @@ class TileManager:
         unharvested: set[Position] = self.unharvested
 
         raw_ores: list[Position] = []
-        enemy_turrets: list[Position] = []
+        dangerous: list[Position] = []
 
         new_conveyor: int = 0
 
@@ -217,6 +217,7 @@ class TileManager:
                         enemy_bitset[yi] &= ~bit
                     else:
                         enemy_bitset[yi] |= bit
+                        dangerous.append(pos)
                     j: int = nxt[index]
                     if j >= 0:
                         adj[j].remove(index)
@@ -255,7 +256,7 @@ class TileManager:
                                 self.has_kill_chamber = True
                         enemy_bitset[yi] &= ~bit
                     else:
-                        enemy_turrets.append(pos)
+                        dangerous.append(pos)
                         enemy_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
@@ -265,7 +266,7 @@ class TileManager:
                     if team == my_team:
                         enemy_bitset[yi] &= ~bit
                     else:
-                        enemy_turrets.append(pos)
+                        dangerous.append(pos)
                         enemy_bitset[yi] |= bit
                     j: int = nxt[index]
                     if j >= 0:
@@ -339,6 +340,7 @@ class TileManager:
             for j in adj[y * W + x]:
                 is_protection[Position(j % W, j // W)] = pos
 
+        fed: set[Position] = set()
         for pos in raw_ores:
             t0 = c.get_cpu_time_elapsed()
             is_mine: bool = True
@@ -356,9 +358,13 @@ class TileManager:
                         if c.get_team(b_id) == my_team:
                             e_type = c.get_entity_type(b_id)
                             if e_type == EntityType.BRIDGE:
-                                has_conveyor = c.get_bridge_target(b_id) != pos
+                                if c.get_bridge_target(b_id) != pos:
+                                    has_conveyor |= True
+                                    fed.add(cur)
                             elif e_type in C.CONVEYOR_VARIANT:
-                                has_conveyor |= cur not in is_protection
+                                if cur not in is_protection:
+                                    has_conveyor |= True
+                                    fed.add(cur)
                             elif e_type in C.UNIMPORTANT:
                                 has_space = True
                                 empty_adj.add(cur)
@@ -384,8 +390,8 @@ class TileManager:
                     if not has_conveyor and has_space:
                         self.build_harvester[yi][xi] = True
                 if is_mine and has_conveyor:
-                    for adj in empty_adj:
-                        lack_protection[adj] = pos
+                    for cur in empty_adj:
+                        lack_protection[cur] = pos
 
             if is_mine:
                 my_ores.add(pos)
@@ -395,8 +401,8 @@ class TileManager:
                 my_ores.discard(pos)
 
             for d in C.CARDINAL:
-                adj: Position = pos.add(d)
-                xi, yi = adj
+                cur: Position = pos.add(d)
+                xi, yi = cur
                 if 0 <= xi < W and 0 <= yi < H:
                     if nxt[yi * W + xi] >= 0:
                         empty_ore.discard(pos)
@@ -409,6 +415,15 @@ class TileManager:
         print(c.get_cpu_time_elapsed())
         self.lack_protection = lack_protection
         self.is_protection = is_protection
+
+        to_destroy = self.to_destroy = set()
+        for pos in dangerous:
+            x, y = pos
+            for i in adj[y * W + x]:
+                x, y = i % W, i // W
+                source: Position = Position(x, y)
+                if adj[i] or source in fed:
+                    to_destroy.add(source)
 
         self.gunners = {
             k: v for k, v in gunners.items() if not c.is_in_vision(k) or ((building_id := get_tile_building_id(k)) is not None and get_entity_type(building_id) == EntityType.GUNNER and get_team(building_id) == my_team)
@@ -521,8 +536,6 @@ class TileManager:
             reach |= reach << W_plus_1 | reach >> W_plus_1
             reach &= empty
         self.reach = reach
-
-        self.enemy_turrets = enemy_turrets
 
     def post_sense(self, c: Controller):
         id_grid: list[list[int]] = self.id_grid
