@@ -211,8 +211,10 @@ class TileManager:
                                         break
                         if is_mine:
                             my_ores.add(pos)
+                            enemy_ores.discard(pos)
                         else:
                             enemy_ores.add(pos)
+                            my_ores.discard(pos)
                 else:
                     if self.ban_harvester[yi][xi]:
                         self.build_harvester[yi][xi] = False
