@@ -1,4 +1,3 @@
-import random
 from cambc import *
 from Unit import *
 import consts as C
@@ -13,88 +12,87 @@ class Launcher(Unit):
         my_pos = c.get_position()
         my_team = c.get_team()
 
-        best: Position | None = None
-        best_score: int = 0
-        for pos in c.get_nearby_tiles():
-            building_id = c.get_tile_building_id(pos)
-            if c.get_entity_type(building_id) == EntityType.CORE:
+        has_input: list[list[bool]] = [[False] * C.W for _ in range(C.H)]
+        adj_launcher: list[list[bool]] = [[False] * C.W for _ in range(C.H)]
+        for building_id in c.get_nearby_buildings():
+            e_type = c.get_entity_type(building_id)
+            if e_type in C.CONVEYOR:
+                nxt: Position = c.get_position(building_id).add(c.get_direction(building_id))
+                if U.on_the_map(nxt):
+                    x, y = nxt
+                    has_input[y][x] = True
+            elif e_type == EntityType.BRIDGE:
+                nxt: Position = c.get_bridge_target(building_id)
+                if U.on_the_map(nxt):
+                    x, y = nxt
+                    has_input[y][x] = True
+            elif e_type == EntityType.LAUNCHER:
                 if c.get_team(building_id) == my_team:
-                    continue
-            elif not c.is_tile_passable(pos):
-                if c.get_entity_type(building_id) == EntityType.GUNNER:
-                    if c.get_team(building_id) == my_team:
-                        nxt = pos.add(c.get_direction(building_id))
-                        if c.is_in_vision(nxt) and c.is_tile_passable(nxt):
-                            best = nxt
-                            best_score = -1
-                            break
-                continue
+                    pos: Position = c.get_position(building_id)
+                    for d in C.CARDINAL:
+                        adj: Position = pos.add(d)
+                        if U.on_the_map(adj):
+                            x, y = adj
+                            adj_launcher[y][x] = True
+            elif e_type == EntityType.SPLITTER:
+                pos: Position = c.get_position(building_id)
+                d: Direction = c.get_direction(building_id).opposite()
+                for e in C.CARDINAL:
+                    if e != d:
+                        nxt: Position = pos.add(e)
+                        if U.on_the_map(nxt):
+                            x, y = nxt
+                            has_input[y][x] = True
 
-            if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
-                continue
+        protect: list[Position] = []
+        for pos in c.get_nearby_tiles():
+            x, y = pos
+            if has_input[y][x] and adj_launcher[y][x]:
+                building_id = c.get_tile_building_id(pos)
+                if c.get_team(building_id) == my_team:
+                    if c.get_entity_type(building_id) == EntityType.ROAD:
+                        protect.append(pos)
+                else:
+                    if c.get_hp(building_id) < c.get_max_hp(building_id):
+                        protect.append(pos)
+                    elif c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
+                        bb_id = c.get_tile_builder_bot_id(pos)
+                        if bb_id is not None and c.get_team(bb_id) == my_team:
+                            protect.append(pos)
 
-            dist = max(abs(pos.x - my_pos.x), abs(pos.y - my_pos.y))
-            score = dist << 12 | random.randint(0, 0xFFF)
-            if score > best_score:
-                best = pos
-                best_score = score
-
-        if best_score != -1:
-            cur = None
-            for d in C.DIRECTIONS:
-                cur = my_pos.add(d)
-                if U.on_the_map(cur):
-                    building_id = c.get_tile_building_id(cur)
-                    if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT:
-                        break
-
-            if cur is not None:
-                friend = None
-                while True:
-                    building_id = c.get_tile_building_id(cur)
-                    e_type = c.get_entity_type(building_id)
-                    if e_type == EntityType.BRIDGE:
-                        cur = c.get_bridge_target(building_id)
-                    elif e_type in C.MONOCHILD_CONVEYOR:
-                        cur = cur.add(c.get_direction(building_id))
-                    else:
-                        break
-
-                    if not c.is_in_vision(cur):
-                        break
-
-                    for d in C.DIRECTIONS:
-                        nxt = cur.add(d)
-                        if U.on_the_map(nxt) and c.is_in_vision(nxt):
-                            b_id = c.get_tile_building_id(nxt)
-                            if b_id is not None and c.get_entity_type(b_id) == EntityType.LAUNCHER:
-                                if c.get_team(b_id) == my_team:
-                                    friend = nxt
-
-                if friend is not None and friend != my_pos:
-                    c.draw_indicator_line(my_pos, friend, 0, 128, 255)
-                    for d in C.DIRECTIONS:
-                        nxt = friend.add(d)
-                        if U.on_the_map(nxt) and c.is_in_vision(nxt):
-                            if c.is_tile_passable(nxt):
-                                best = nxt
-                                break
-
-        if best is None:
+        if all(pos.distance_squared(my_pos) > 1 for pos in protect) and all(c.get_entity_type(bb_id) != EntityType.BUILDER_BOT or c.get_team(bb_id) != my_team for bb_id in c.get_nearby_units(4)):
+            c.self_destruct()
             return
 
-        best_enemy: Position | None = None
-        for bb_id in c.get_nearby_units(2):
-            if c.get_team(bb_id) == my_team:
-                continue
+        if protect:
+            for pos in protect:
+                c.draw_indicator_line(my_pos, pos, 0, 128, 255)
 
-            pos = c.get_position(bb_id)
-            building_id = c.get_tile_building_id(pos)
-            if c.can_launch(pos, best):
-                if c.get_entity_type(building_id) in C.CONVEYOR_VARIANT and c.get_team(building_id) == my_team:
-                    c.launch(pos, best)
-                    return
-                best_enemy = pos  # TODO
+                def get_dist(pos: Position) -> int:
+                    return max(pos.distance_squared(cur) for cur in protect)
 
-        if best_enemy is not None:
-            c.launch(best_enemy, best)
+                best_enemy: Position | None = None
+                best_dist: int = 100
+                for bb_id in c.get_nearby_units():
+                    if c.get_entity_type(bb_id) != EntityType.BUILDER_BOT:
+                        continue
+                    pos: Position = c.get_position(bb_id)
+                    if pos.distance_squared(my_pos) <= 2:
+                        if c.get_team(bb_id) != my_team:
+                            dist: int = get_dist(pos)
+                            if dist < best_dist:
+                                best_enemy = pos
+                                best_dist = dist
+
+                best_throw: Position | None = None
+                best_dist: int = 0
+                if best_enemy is not None:
+                    for pos in c.get_nearby_tiles():
+                        if c.can_launch(best_enemy, pos):
+                            dist: int = get_dist(pos)
+                            if dist > best_dist:
+                                best_throw = pos
+                                best_dist = dist
+
+                    if best_throw is not None:
+                        c.launch(best_enemy, best_throw)
